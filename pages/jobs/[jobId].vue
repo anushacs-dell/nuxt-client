@@ -103,6 +103,7 @@ import { useRoute } from 'vue-router'
 import { ref, onMounted, onBeforeUnmount, computed, nextTick, watch } from 'vue'
 import { useRuntimeConfig } from '#imports'
 import { useAuthStore } from '~/stores/auth'
+import { useLangStore } from '~/stores/lang'
 
 import Map from 'ol/Map'
 import View from 'ol/View'
@@ -115,6 +116,7 @@ import VectorLayer from 'ol/layer/Vector'
 const route = useRoute()
 const config = useRuntimeConfig()
 const authStore = useAuthStore()
+const langStore = useLangStore()
 
 const jobId = route.params.jobId
 const jobData = ref<any>(null)
@@ -129,6 +131,12 @@ const mapInstance = ref<Map>()
 onMounted(() => {
   fetchJobDetails()
   intervalId = setInterval(fetchJobDetails, 3000)
+})
+
+watch(() => langStore.preferredLanguage, async () => {
+  console.log('Language changed. Re-fetching...')
+  await checkConformance()
+  await fetchData()
 })
 
 onBeforeUnmount(() => {
@@ -167,6 +175,7 @@ const fetchJobDetails = async () => {
     const response = await $fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/jobs/${jobId}`, {
       headers: {
         Authorization: `Bearer ${authStore.token.access_token}`,
+        'Accept-Language': langStore.preferredLanguage
       },
     })
     jobData.value = response
@@ -193,6 +202,7 @@ const fetchLinkContent = async (href: string) => {
     const response = await $fetch(href, {
       headers: {
         Authorization: `Bearer ${authStore.token.access_token}`,
+        'Accept-Language': langStore.preferredLanguage
       },
     })
 

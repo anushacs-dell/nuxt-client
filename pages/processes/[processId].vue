@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useLangStore } from '~/stores/lang'
 import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useRuntimeConfig } from '#imports'
@@ -9,6 +10,7 @@ const {
 
 const authStore = useAuthStore()
 const config = useRuntimeConfig()
+const langStore = useLangStore()
 
 const data = ref(null)
 const inputValues = ref<Record<string, any>>({})
@@ -30,7 +32,8 @@ const fetchData = async () => {
   try {
     data.value = await $fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/processes/${processId}`, {
       headers: {
-        Authorization: `Bearer ${authStore.token.access_token}`
+        Authorization: `Bearer ${authStore.token.access_token}`,
+        'Accept-Language': langStore.preferredLanguage
       }
     })
 
@@ -74,6 +77,12 @@ const fetchData = async () => {
 
 onMounted(() => {
   fetchData()
+})
+
+watch(() => langStore.preferredLanguage, async () => {
+  console.log('Language changed. Re-fetching...')
+  await checkConformance()
+  await fetchData()
 })
 
 const convertOutputsToPayload = (outputs: Record<string, any[]>) => {
@@ -136,7 +145,8 @@ watch([inputValues, outputValues, subscriberValues], ([newInputs, newOutputs, ne
 const pollJobStatus = async (jobId: string) => {
   const jobUrl = `${config.public.NUXT_ZOO_BASEURL}/ogc-api/jobs/${jobId}`
   const headers = {
-    Authorization: `Bearer ${authStore.token.access_token}`
+    Authorization: `Bearer ${authStore.token.access_token}`,
+    'Accept-Language': langStore.preferredLanguage
   }
 
   while (true) {
@@ -175,7 +185,8 @@ const submitProcess = async () => {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${authStore.token.access_token}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept-Language': langStore.preferredLanguage
       },
       body: JSON.stringify(payload)
     })
@@ -193,7 +204,7 @@ const submitProcess = async () => {
 }
 
 const isMultipleInput = (input: any) => {
-  return input.maxOccurs > 1
+  return input.maxOccurs > 1 ? true : false
 }
 
 const addInputField = (inputId: string) => {
@@ -209,6 +220,7 @@ const removeInputField = (inputId: string, index: number) => {
   }
 }
 </script>
+
 
 <template>
   <q-page class="q-pa-md">

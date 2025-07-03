@@ -97,14 +97,15 @@
 
 
 <script setup lang="ts">
+import { useLangStore } from '~/stores/lang'
 import { ref, onMounted } from 'vue'
 import { useRuntimeConfig } from '#imports'
 
-const authStore = useAuthStore()
 const landingLinks = ref<any[]>([])
 const apiInfo = ref<any>(null)
 const loading = ref(false)
 const config = useRuntimeConfig()
+const langStore = useLangStore()
 
 const landingUrl = `${config.public.NUXT_ZOO_BASEURL}/ogc-api/`
 const apiSpecUrl = `${config.public.NUXT_ZOO_BASEURL}/ogc-api/api`
@@ -112,22 +113,16 @@ const apiSpecUrl = `${config.public.NUXT_ZOO_BASEURL}/ogc-api/api`
 const fetchLandingAndApiInfo = async () => {
   loading.value = true
   try {
-    const landingRes = await $fetch(landingUrl, {
-      headers: {
-        Authorization: `Bearer ${authStore.token.access_token}`
-      }
-    })
+    const headers = {
+      'Accept-Language': langStore.preferredLanguage
+    }
+    const landingRes = await $fetch(landingUrl)
     landingLinks.value = landingRes.links || []
 
     const apiRes = await $fetch(apiSpecUrl)
     apiInfo.value = apiRes.info || {}
   } catch (err) {
     console.error('Error loading homepage data:', err)
-    const landingRes = await $fetch(landingUrl)
-    landingLinks.value = landingRes.links || []
-
-    const apiRes = await $fetch(apiSpecUrl)
-    apiInfo.value = apiRes.info || {}
   } finally {
     loading.value = false
   }
@@ -167,4 +162,5 @@ const getReadableLinkText = (link: any): string => {
 
 
 onMounted(fetchLandingAndApiInfo)
+
 </script>

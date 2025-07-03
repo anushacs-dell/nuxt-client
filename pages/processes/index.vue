@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { useLangStore } from '~/stores/lang'
 import { ref, computed, onMounted } from 'vue'
 import { useRuntimeConfig, useRouter } from '#imports'
 
 const authStore = useAuthStore()
+const langStore = useLangStore()
 const config = useRuntimeConfig()
 const data = ref(null)
 const filter = ref('')
@@ -23,7 +25,8 @@ const packageProcess = async (row: any) => {
         method: 'GET',
         headers: {
           "Accept": "application/cwl+yaml",
-          'Authorization': `Bearer ${authStore.token.access_token}`
+          'Authorization': `Bearer ${authStore.token.access_token}`,
+          'Accept-Language': langStore.preferredLanguage
         }
       })
       if (response.ok) {
@@ -49,7 +52,8 @@ const checkConformance = async () => {
     const response = await fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/conformance`, {
       method: 'GET',
       headers: {
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        'Accept-Language': langStore.preferredLanguage
       }
     })
 
@@ -80,7 +84,8 @@ const deleteProcess = async (row: any) => {
       const response = await fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/processes/${row.id}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${authStore.token.access_token}`
+          'Authorization': `Bearer ${authStore.token.access_token}`,
+          'Accept-Language': langStore.preferredLanguage
         }
       })
       
@@ -155,7 +160,8 @@ const submitForm = async () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/cwl+yaml',
-        'Authorization': `Bearer ${authStore.token.access_token}`
+        'Authorization': `Bearer ${authStore.token.access_token}`,
+        'Accept-Language': langStore.preferredLanguage
       },
       body: fileContent.value,
     })
@@ -191,7 +197,8 @@ const fetchData = async () => {
   try {
     data.value = await $fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/processes`, {
       headers: {
-        Authorization: `Bearer ${authStore.token.access_token}`
+        Authorization: `Bearer ${authStore.token.access_token}`,
+        'Accept-Language': langStore.preferredLanguage
       }
     })
   } catch (error) {
@@ -202,6 +209,12 @@ const fetchData = async () => {
 onMounted(() => {
   checkConformance()
   fetchData()
+})
+
+watch(() => langStore.preferredLanguage, async () => {
+  console.log('Language changed. Re-fetching...')
+  await checkConformance()
+  await fetchData()
 })
  
 const columns = [

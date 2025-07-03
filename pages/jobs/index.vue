@@ -66,6 +66,7 @@
 </template>
 
 <script setup lang="ts">
+import { useLangStore } from '~/stores/lang'
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRuntimeConfig } from '#imports'
@@ -75,6 +76,7 @@ import { Notify } from 'quasar'
 const config = useRuntimeConfig()
 const authStore = useAuthStore()
 const router = useRouter()
+const langStore = useLangStore()
 
 const data = ref<any>(null)
 const loading = ref(false)
@@ -87,7 +89,8 @@ const fetchData = async () => {
   try {
     const response = await $fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/jobs`, {
       headers: {
-        Authorization: `Bearer ${authStore.token.access_token}`
+        Authorization: `Bearer ${authStore.token.access_token}`,
+        'Accept-Language': langStore.preferredLanguage
       }
     })
     data.value = response
@@ -109,7 +112,8 @@ const fetchLinkContent = async (href: string) => {
   try {
     const res = await $fetch(href, {
       headers: {
-        Authorization: `Bearer ${authStore.token.access_token}`
+        Authorization: `Bearer ${authStore.token.access_token}`,
+        'Accept-Language': langStore.preferredLanguage
       }
     })
     modalContent.value = typeof res === 'object' ? JSON.stringify(res, null, 2) : res
@@ -127,7 +131,8 @@ const deleteJob = async (row: any) => {
     await $fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/jobs/${row.jobID}`, {
       method: 'DELETE',
       headers: {
-        Authorization: `Bearer ${authStore.token.access_token}`
+        Authorization: `Bearer ${authStore.token.access_token}`,
+        'Accept-Language': langStore.preferredLanguage
       }
     })
     Notify.create({
@@ -165,6 +170,11 @@ onMounted(() => {
   fetchData()
 })
 
+watch(() => langStore.preferredLanguage, async () => {
+  console.log('Language changed. Re-fetching...')
+  await checkConformance()
+  await fetchData()
+})
 
 const rows = computed(() => {
   return data.value?.jobs || []
