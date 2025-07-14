@@ -1,16 +1,17 @@
 <script setup lang="ts">
-import { useLangStore } from '~/stores/lang'
 import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useRuntimeConfig } from '#imports'
+import { useI18n } from 'vue-i18n'
 
 const {
   params: { processId }
 } = useRoute()
 
 const authStore = useAuthStore()
+const { locale, t } = useI18n()
 const config = useRuntimeConfig()
-const langStore = useLangStore()
+
 
 const data = ref(null)
 const inputValues = ref<Record<string, any>>({})
@@ -33,7 +34,7 @@ const fetchData = async () => {
     data.value = await $fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/processes/${processId}`, {
       headers: {
         Authorization: `Bearer ${authStore.token.access_token}`,
-        'Accept-Language': langStore.preferredLanguage
+        'Accept-Language': locale.value
       }
     })
 
@@ -79,10 +80,7 @@ onMounted(() => {
   fetchData()
 })
 
-watch(() => langStore.preferredLanguage, async () => {
-  console.log('Language changed. Re-fetching...')
-  await fetchData()
-})
+
 
 const convertOutputsToPayload = (outputs: Record<string, any[]>) => {
   const result: Record<string, any> = {}
@@ -145,7 +143,7 @@ const pollJobStatus = async (jobId: string) => {
   const jobUrl = `${config.public.NUXT_ZOO_BASEURL}/ogc-api/jobs/${jobId}`
   const headers = {
     Authorization: `Bearer ${authStore.token.access_token}`,
-    'Accept-Language': langStore.preferredLanguage
+    'Accept-Language': locale.value
   }
 
   while (true) {
@@ -185,7 +183,7 @@ const submitProcess = async () => {
       headers: {
         Authorization: `Bearer ${authStore.token.access_token}`,
         'Content-Type': 'application/json',
-        'Accept-Language': langStore.preferredLanguage
+        'Accept-Language': locale.value
       },
       body: JSON.stringify(payload)
     })
@@ -241,7 +239,7 @@ const removeInputField = (inputId: string, index: number) => {
 
   <div class="q-mb-lg">
     <div class="text-h4 text-weight-bold text-primary q-mb-sm">
-      Inputs
+      {{ t('Inputs') }}
     </div>
     <q-separator class="q-mt-md" />
   </div>
@@ -261,7 +259,7 @@ const removeInputField = (inputId: string, index: number) => {
           size="sm"
           @click="addInputField(inputId)"
         >
-          <q-tooltip>Add another value</q-tooltip>
+          <q-tooltip>{{ t('Add another value') }}</q-tooltip>
         </q-btn>
         <q-btn 
           v-if="isMultipleInput(input)"
@@ -273,7 +271,7 @@ const removeInputField = (inputId: string, index: number) => {
           size="sm"
           @click="removeInputField(inputId)"
         >
-          <q-tooltip>Delete the last value</q-tooltip>
+          <q-tooltip>{{ t('Delete the last value') }}</q-tooltip>
         </q-btn>
       </div>
 
@@ -341,8 +339,8 @@ const removeInputField = (inputId: string, index: number) => {
   </div>
 
   <div class="q-mt-md row q-gutter-sm">
-    <q-btn label="Submit" type="submit" color="primary" />
-    <q-btn color="primary" outline label="Show JSON Preview" @click="showDialog = true" />
+    <q-btn :label="t('Submit')" type="submit" color="primary" />
+    <q-btn color="primary" outline :label="t('Show JSON Preview')" @click="showDialog = true" />
   </div>
 
 </q-form>
@@ -351,16 +349,16 @@ const removeInputField = (inputId: string, index: number) => {
       <q-dialog v-model="showDialog" persistent>
         <q-card style="min-width: 70vw; max-width: 90vw;">
           <q-card-section>
-            <div class="text-h6">Execute Request Confirmation</div>
+            <div class="text-h6">{{ t('Execute Request Confirmation') }}</div>
           </q-card-section>
 
           <q-card-section class="q-pt-none">
             <q-banner dense class="bg-grey-2 text-black q-pa-sm">
-              This is the full request that will be sent to the Execute endpoint:
+             {{ t('This is the full request that will be sent to the Execute endpoint:') }}
             </q-banner>
             <q-input
               v-model="jsonRequestPreview"
-              label="execute request"
+              :label="t('Execute request')"
               type="textarea"
               @change="jsonRequestPreview = $event.target.value"
               required
@@ -373,7 +371,7 @@ const removeInputField = (inputId: string, index: number) => {
           <q-card-actions align="right">
             <q-btn flat label="Cancel" color="primary" v-close-popup />
             <q-btn
-              label="Submit Request"
+              label="t('Submit Request')"
               color="primary"
               :loading="loading"
               @click="() => { showDialog = false; submitProcess() }"
@@ -384,13 +382,13 @@ const removeInputField = (inputId: string, index: number) => {
 
       <div class="q-mt-md" v-if="loading">
         <q-linear-progress indeterminate color="primary" />
-        <div class="text-caption text-primary q-mt-sm">Execution in progress... Status: {{ jobStatus }}</div>
+        <div class="text-caption text-primary q-mt-sm">{{ t('Execution in progress...') }} {{ t('Status') }}: {{ jobStatus }}</div>
       </div>
 
       <div class="q-mt-lg" v-if="response">
-        <h6>Execution Response</h6>
+        <h6>{{ t('Execution Response') }}</h6>
         <details>
-          <summary class="text-primary text-bold cursor-pointer">Show Raw JSON</summary>
+          <summary class="text-primary text-bold cursor-pointer">{{t('Show Raw JSON')}}</summary>
           <pre>{{ JSON.stringify(response, null, 2) }}</pre>
         </details>
       </div>

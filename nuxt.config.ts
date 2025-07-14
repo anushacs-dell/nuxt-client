@@ -4,11 +4,11 @@ import {defineQuasarConfig} from './quasar.config'
 export default defineNuxtConfig({
     app: {
         head: {
-            title: 'ZOO-Project Nuxt Client',
+            title: 'ZooProject Nuxt Client',
             meta: [
                 {
                     name: 'description',
-                    content: 'ZOO-Project WebApp Client Made with Nuxt3 and VueJS 3.'
+                    content: 'ZooProject WebApp Client Made with Nuxt3 and VueJS 3.'
                 }
             ],
             link: [
@@ -16,7 +16,7 @@ export default defineNuxtConfig({
             ]
         },
     },
-    compatibilityDate: '2024-12-31',
+    compatibilityDate: '2024-04-03',
     devtools: {enabled: true},
     components: true,
     imports: {
@@ -31,7 +31,24 @@ export default defineNuxtConfig({
     vue: {
         compilerOptions: {}
     },
-    modules: ["@pinia/nuxt", "nuxt-quasar-ui", "@sidebase/nuxt-auth"],
+    modules: ["@pinia/nuxt", "nuxt-quasar-ui", "@sidebase/nuxt-auth","@nuxtjs/i18n"],
+
+    i18n: {
+        langDir: 'locales',
+        locales: [
+          { code: 'en', iso: 'en-US', file: 'en.json', name: 'English' },
+          { code: 'fr', iso: 'fr-FR', file: 'fr.json', name: 'Française' }
+        ],
+        defaultLocale: 'en',
+        lazy: true,
+        strategy: 'no_prefix',
+        detectBrowserLanguage: {
+          useCookie: true,
+          cookieKey: 'i18n_redirected',
+          fallbackLocale: 'en',
+        }
+      },
+      
 
     auth: {
         isEnabled: true,

@@ -28,17 +28,17 @@
         <div class="row">
             <div class="q-pt-sm q-pr-md" style="padding-top: 3px;">
               <q-select
-                v-model="langStore.preferredLanguage"
+                v-model="selectedLang"
                 :options="[
                   { label: 'English', value: 'en' },
-                  { label: 'Française', value: 'fr-FR' }
+                  { label: 'Française', value: 'fr' }
                 ]"
                 dense
                 borderless
                 emit-value
                 map-options
                 style="width: 150px"
-                label="Language"
+                :label="t('Language')"
               />
       </div>
           <div class="q-pt-sm" style="padding-top: 36px;">
@@ -59,21 +59,21 @@
             <q-menu>
               <q-list dense>
                 <q-item clickable v-close-popup class="q-px-lg">
-                  <q-item-section class="q-px-sm">Profile</q-item-section>
+                  <q-item-section class="q-px-sm">{{ t('Profile') }}</q-item-section>
                 </q-item>
                 <q-item clickable v-close-popup>
-                  <q-item-section class="q-px-sm">Sample</q-item-section>
+                  <q-item-section class="q-px-sm">{{ t('Sample') }}</q-item-section>
                 </q-item>
                 <q-item clickable v-close-popup>
-                  <q-item-section class="q-px-sm">Recent activity</q-item-section>
+                  <q-item-section class="q-px-sm">{{ t('Recent Activity') }}</q-item-section>
                 </q-item>
                 <q-separator/>
                 <q-item clickable v-close-popup to="/help">
-                  <q-item-section class="q-px-sm">Help</q-item-section>
+                  <q-item-section class="q-px-sm">{{ t('Help') }}</q-item-section>
                 </q-item>
                 <q-separator/>
                 <q-item clickable v-close-popup @click="showLogoutDialog">
-                  <q-item-section class="q-px-sm">Logout</q-item-section>
+                  <q-item-section class="q-px-sm">{{ t('logout') }}</q-item-section>
                 </q-item>
               </q-list>
             </q-menu>
@@ -85,15 +85,15 @@
     <div class="row">
       <div class="col-auto">
         <q-tabs dense align="left">
-          <q-route-tab no-caps to="/" label="Home"/>
+          <q-route-tab no-caps to="/" :label="t('Home')" />
         </q-tabs>
       </div>
       <q-space/>
       <div class="col-auto">
         <q-tabs dense align="left">
-          <q-route-tab v-if="authStore.user" no-caps to="/swagger" label="Swagger"/>
-          <q-route-tab v-if="authStore.user" no-caps to="/processes" label="Processes"/>
-          <q-route-tab v-if="authStore.user" no-caps to="/jobs" label="Jobs"/>
+          <q-route-tab v-if="authStore.user" no-caps to="/swagger" :label="t('Swagger')" />
+          <q-route-tab v-if="authStore.user" no-caps to="/processes" :label="t('Processes')" />
+          <q-route-tab v-if="authStore.user" no-caps to="/jobs" :label="t('Jobs')" />
         </q-tabs>
       </div>
     </div>
@@ -101,7 +101,9 @@
 </template>
 
 <script setup lang="ts">
-import { useLangStore } from '~/stores/lang'
+import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useCookie } from '#app'
 const config = useRuntimeConfig()
 const showHeaderMenu = ref(false)
 const isLoggedUser = ref(false) // TODO: Implement user authentication and pinia storage of user data
@@ -109,7 +111,15 @@ const loggedUser = ref({email: 'mathereall@gmail.com'}) // TODO: Implement user 
 
 
 const authStore = useAuthStore()
-const langStore = useLangStore()
+const { locale, t } = useI18n()
+
+const selectedLang = ref(locale.value)
+
+watch(selectedLang, (newLang) => {
+  locale.value = newLang
+  useCookie('i18n_redirected').value = newLang
+})
+
 const $q = useQuasar()
 const stringToMD5 = useStringToMD5()
 
@@ -125,16 +135,16 @@ const isSmallScreen = computed(() => {
 
 const showLogoutDialog = () => {
   $q.dialog({
-    title: 'Logout',
-    message: 'Are you sure you want to logout?',
+   title: t('logout'),
+    message: t('Are you sure you want to logout?'),
     ok: {
-      label: 'Logout',
-      color: 'primary',
+      label: t('ok'),
+      color: 'primary'
     },
     cancel: {
-      label: 'Cancel',
-      color: 'negative',
-    },
+      label: t('cancel'),
+      color: 'negative'
+    }
   }).onOk(() => {
     handleLogout()
   })
@@ -188,7 +198,4 @@ onMounted(() => {
 
 </script>
 
-<style scoped>
-
-</style>
 

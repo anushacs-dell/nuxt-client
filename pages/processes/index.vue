@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { useLangStore } from '~/stores/lang'
 import { ref, computed, onMounted } from 'vue'
 import { useRuntimeConfig, useRouter } from '#imports'
+import { useI18n } from 'vue-i18n'
 
 const authStore = useAuthStore()
-const langStore = useLangStore()
+const { locale, t } = useI18n()
+
 const config = useRuntimeConfig()
 const data = ref(null)
 const filter = ref('')
@@ -26,7 +27,7 @@ const packageProcess = async (row: any) => {
         headers: {
           "Accept": "application/cwl+yaml",
           'Authorization': `Bearer ${authStore.token.access_token}`,
-          'Accept-Language': langStore.preferredLanguage
+           'Accept-Language': locale.value
         }
       })
       if (response.ok) {
@@ -53,7 +54,7 @@ const checkConformance = async () => {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Accept-Language': langStore.preferredLanguage
+         'Accept-Language': locale.value
       }
     })
 
@@ -79,19 +80,19 @@ const checkConformance = async () => {
 }
 
 const deleteProcess = async (row: any) => {
-  if (confirm(`Are you sure you want to delete the process "${row.id}"?`)) {
+  if (confirm(t('Are you sure you want to delete the process') + ` "${row.id}"?`)) {
     try {
       const response = await fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/processes/${row.id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${authStore.token.access_token}`,
-          'Accept-Language': langStore.preferredLanguage
+          'Accept-Language': locale.value
         }
       })
       
       if (response.ok) {
         Notify.create({
-          message: 'Process deleted successfully',
+          message: t('Process deleted successfully'),
           type: 'positive'
         })
         await fetchData()
@@ -99,14 +100,14 @@ const deleteProcess = async (row: any) => {
       } else {
         console.error('Error deleting process')
         Notify.create({
-          message: 'Process deletion failed',
+          message: t('Process deletion failed'),
           type: 'negative'
         })
       }
     } catch (error) {
       console.error('Delete request failed', error)
       Notify.create({
-        message: 'Delete request failed',
+        message: t('Delete request failed'),
         color: 'negative',
         icon: 'error'
       })
@@ -153,7 +154,7 @@ const submitForm = async () => {
     formData.append('file', file.value)
     Notify.create({
           spinner: QSpinnerGears,
-          message: 'Deploying process...',
+          message: t('Deploying process...'),
           timeout: 2000
     })
     const response = await fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/processes?w=${processName.value}`, {
@@ -161,7 +162,7 @@ const submitForm = async () => {
       headers: {
         'Content-Type': 'application/cwl+yaml',
         'Authorization': `Bearer ${authStore.token.access_token}`,
-        'Accept-Language': langStore.preferredLanguage
+         'Accept-Language': locale.value
       },
       body: fileContent.value,
     })
@@ -169,14 +170,14 @@ const submitForm = async () => {
     if(response.ok) {
       console.log('Process deployed successfully.')
       Notify.create({
-        message: 'Process deployed successfully',
+        message: t('Process deployed successfully'),
         type: 'positive'
       })
       fetchData()
     } else {
       console.error('Error deploying process.')
       Notify.create({
-        message: 'Failed to deploy process',
+        message: t('Failed to deploy process'),
         color: 'negative',
         icon: 'error'
       })
@@ -184,7 +185,7 @@ const submitForm = async () => {
   } catch (error) {
     console.error('Request failed', error)
       Notify.create({
-        message: 'Request failed',
+        message: t('Request failed'),
         color: 'negative',
         icon: 'error'
       })
@@ -198,7 +199,7 @@ const fetchData = async () => {
     data.value = await $fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/processes`, {
       headers: {
         Authorization: `Bearer ${authStore.token.access_token}`,
-        'Accept-Language': langStore.preferredLanguage
+        'Accept-Language': locale.value
       }
     })
   } catch (error) {
@@ -211,11 +212,6 @@ onMounted(() => {
   fetchData()
 })
 
-watch(() => langStore.preferredLanguage, async () => {
-  console.log('Language changed. Re-fetching...')
-  await checkConformance()
-  await fetchData()
-})
  
 const columns = [
   { name: 'id', label: '#', field: 'id', align: 'left', sortable: true },
@@ -252,12 +248,12 @@ const onClearSearch = async () => {
   <q-page class="q-pa-sm">
     <div class="row justify-center">
       <div class="col-12 q-pa-md" style="max-width: 1080px;">
-        <p class="text-h4 q-mb-md text-weight-bold">Processes List</p>
+        <p class="text-h4 q-mb-md text-weight-bold">{{t('Processes List')}}</p>
         <q-btn
           v-if="isConformToCwl === true"
           color="primary"
           icon="add"
-          label="Add Process"
+          :label="t('Add Process')"
           @click="openDialog"
           :loading="isCheckingConformance"
         />
@@ -267,7 +263,7 @@ const onClearSearch = async () => {
           <q-input
             filled
             v-model="filter"
-            label="Search"
+            :label="t('Search')"
             debounce="300"
             clearable
             prepend-icon="search"
@@ -276,7 +272,7 @@ const onClearSearch = async () => {
         </div>
  
         <q-table
-          title="Processes List"
+          :title="t('Processes List')"
           :rows="rows"
           :columns="columns"
           row-key="id"
@@ -286,13 +282,13 @@ const onClearSearch = async () => {
               <q-btn-dropdown v-if="row.mutable === true" color="primary" label="Actions" flat >
                 <q-list>
                   <q-item clickable v-close-popup @click="viewProcess(row)">
-                    <q-item-section>View</q-item-section>
+                    <q-item-section>{{t('View')}}</q-item-section>
                   </q-item>
                   <q-item clickable v-close-popup @click="packageProcess(row)">
-                    <q-item-section>Package</q-item-section>
+                    <q-item-section>{{ t('Package') }}</q-item-section>
                   </q-item>
                   <q-item clickable v-close-popup @click="deleteProcess(row)">
-                    <q-item-section class="text-negative">Delete</q-item-section>
+                    <q-item-section class="text-negative">{{t('Delete')}}</q-item-section>
                   </q-item>
                 </q-list>
               </q-btn-dropdown>
@@ -310,15 +306,15 @@ const onClearSearch = async () => {
     <q-dialog v-model="dialog" persistent>
       <q-card style="min-width: 800px; max-width: 90vw;">
         <q-card-section>
-          <div class="text-h6">Add a Process</div>
+          <div class="text-h6">{{t('Add a Process')}}</div>
         </q-card-section>
 
         <q-card-section>
           <q-form @submit.prevent="submitForm">
-            <q-input v-model="processName" label="Process Name" />
+            <q-input v-model="processName" :label="t('Process Name')" />
 
             <q-uploader
-              label="Upload a .cwl file"
+              :label="t('Upload a .cwl file')"
               accept=".cwl"
               @added="onFileAdded"
               ref="uploader"
@@ -329,15 +325,15 @@ const onClearSearch = async () => {
 
             <q-input
               v-model="fileContent"
-              label="File Content"
+              :label="t('File Content')"
               type="textarea"
               @change="fileContent = $event.target.value"
               required
             />
 
             <div class="q-mt-md">
-              <q-btn type="submit" label="Submit" color="primary" />
-              <q-btn flat label="Cancel" @click="closeDialog" color="negative" />
+              <q-btn type="submit" :label="t('Submit')" color="primary" />
+              <q-btn flat :label="t('Cancel')" @click="closeDialog" color="negative" />
             </div>
           </q-form>
         </q-card-section>

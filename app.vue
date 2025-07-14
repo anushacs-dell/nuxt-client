@@ -5,10 +5,15 @@
   </NuxtLayout>
 </template>
 <script setup lang="ts">
-import { useLangStore } from '~/stores/lang'
-const langStore = useLangStore()
+import { useI18n } from 'vue-i18n'
+import { useCookie } from '#app'
 
-langStore.initLanguage()
+const { locale } = useI18n()
+const langCookie = useCookie('i18n_redirected')
+
+if (langCookie.value && langCookie.value !== locale.value) {
+  locale.value = langCookie.value
+}
 </script>
 
 <style>

@@ -2,12 +2,12 @@
   <q-page class="q-pa-sm">
     <div class="row justify-center">
       <div class="col-12 q-pa-lg" style="max-width: 1080px;">
-        <p class="text-h4 q-mb-md text-weight-bold">Jobs List</p>
+        <p class="text-h4 q-mb-md text-weight-bold">{{ t('Jobs List') }}</p>
         <q-separator />
 
         <q-card class="q-pa-md q-mt-md shadow-2 rounded-borders">
           <q-table
-            title="Jobs List"
+            :title="t('Jobs List')"
             :rows="rows"
             :columns="columns"
             row-key="jobID"
@@ -32,10 +32,10 @@
                     </q-item>
 
                     <q-item clickable v-close-popup @click="viewJob(props.row)">
-                      <q-item-section>View</q-item-section>
+                      <q-item-section>{{ t('View') }}</q-item-section>
                     </q-item>
                     <q-item clickable v-close-popup @click="deleteJob(props.row)">
-                      <q-item-section class="text-negative">Delete</q-item-section>
+                      <q-item-section class="text-negative">{{ t('Delete') }}</q-item-section>
                     </q-item>
                   </q-list>
                 </q-btn-dropdown>
@@ -47,7 +47,7 @@
         <q-dialog v-model="showModal" persistent>
           <q-card style="min-width: 600px; max-width: 90vw;" class="rounded-borders">
             <q-card-section class="row items-center q-pb-none">
-              <div class="text-h6">Link Content</div>
+              <div class="text-h6">{{ t('Link Content') }}</div>
               <q-space />
               <q-btn icon="close" flat round dense @click="showModal = false" />
             </q-card-section>
@@ -56,7 +56,7 @@
               <div v-if="modalContent">
                 <pre>{{ modalContent }}</pre>
               </div>
-              <div v-else class="text-negative">No data or failed to fetch.</div>
+              <div v-else class="text-negative">{{ t('No data or failed to fetch') }}</div>
             </q-card-section>
           </q-card>
         </q-dialog>
@@ -66,22 +66,28 @@
 </template>
 
 <script setup lang="ts">
-import { useLangStore } from '~/stores/lang'
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRuntimeConfig } from '#imports'
 import { useAuthStore } from '~/stores/auth'
+import { useI18n } from 'vue-i18n'
 import { Notify } from 'quasar'
+
 
 const config = useRuntimeConfig()
 const authStore = useAuthStore()
 const router = useRouter()
-const langStore = useLangStore()
+
+const { locale, t } = useI18n()
+
+
+
 
 const data = ref<any>(null)
 const loading = ref(false)
 const showModal = ref(false)
 const modalContent = ref('')
+
 
 
 const fetchData = async () => {
@@ -90,14 +96,14 @@ const fetchData = async () => {
     const response = await $fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/jobs`, {
       headers: {
         Authorization: `Bearer ${authStore.token.access_token}`,
-        'Accept-Language': langStore.preferredLanguage
+        'Accept-Language': locale.value
       }
     })
     data.value = response
   } catch (error) {
     console.error('Error fetching jobs:', error)
     Notify.create({
-      message: 'Failed to fetch jobs list',
+      message: t('Failed to fetch jobs list'),
       color: 'negative',
       icon: 'error'
     })
@@ -113,7 +119,7 @@ const fetchLinkContent = async (href: string) => {
     const res = await $fetch(href, {
       headers: {
         Authorization: `Bearer ${authStore.token.access_token}`,
-        'Accept-Language': langStore.preferredLanguage
+        'Accept-Language': locale.value
       }
     })
     modalContent.value = typeof res === 'object' ? JSON.stringify(res, null, 2) : res
@@ -132,11 +138,11 @@ const deleteJob = async (row: any) => {
       method: 'DELETE',
       headers: {
         Authorization: `Bearer ${authStore.token.access_token}`,
-        'Accept-Language': langStore.preferredLanguage
+        'Accept-Language': locale.value
       }
     })
     Notify.create({
-      message: 'Job deleted successfully',
+      message: t('Job deleted successfully'),
       color: 'positive',
       icon: 'check'
     })
@@ -144,7 +150,7 @@ const deleteJob = async (row: any) => {
   } catch (error) {
     console.error('Error deleting job:', error)
     Notify.create({
-      message: 'Failed to delete job',
+      message: t('Failed to delete job'),
       color: 'negative',
       icon: 'error'
     })
@@ -170,22 +176,18 @@ onMounted(() => {
   fetchData()
 })
 
-watch(() => langStore.preferredLanguage, async () => {
-  console.log('Language changed. Re-fetching...')
-  await fetchData()
-})
 
 const rows = computed(() => {
   return data.value?.jobs || []
 })
 
 
-const columns = [
-  { name: 'jobID', label: 'Job ID', field: 'jobID', align: 'left', sortable: true },
-  { name: 'processID', label: 'Process', field: 'processID', align: 'left' },
-  { name: 'status', label: 'Status', field: 'status', align: 'left' },
-  { name: 'created', label: 'Created', field: 'created', align: 'left' },
-  { name: 'actions', label: 'Actions', field: 'actions', align: 'center' }
-]
+const columns = computed(() => [
+  { name: 'jobID', label: t('Job ID'), field: 'jobID', align: 'left', sortable: true },
+  { name: 'processID', label: t('Process'), field: 'processID', align: 'left' },
+  { name: 'status', label: t('Status'), field: 'status', align: 'left' },
+  { name: 'created', label: t('Created'), field: 'created', align: 'left' },
+  { name: 'actions', label: t('Actions'), field: 'actions', align: 'center' }
+])
 
 </script>
