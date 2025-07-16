@@ -2,6 +2,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useRuntimeConfig } from '#imports'
+import { reactive } from 'vue'
 
 const {
   params: { processId }
@@ -38,6 +39,39 @@ const fetchData = async () => {
     if (data.value && data.value.inputs) {
       for (const [key, input] of Object.entries(data.value.inputs)) {
         console.log(input)
+        console.log('isComplexInput:', input, isComplexInput(input))
+
+        if (
+          input?.schema?.contentMediaType ||
+          input?.schema?.mediaType ||
+          (input?.schema?.oneOf?.some(f => f.contentMediaType))
+        ) {
+          const supportedFormats = input.schema.oneOf?.map(f => f.contentMediaType) || ['application/json', 'text/xml', 'text/plain'];
+
+          inputValues.value[key] = {
+            mode: 'href',
+            href: '',
+            value: '',
+            format: supportedFormats[0],
+            availableFormats: supportedFormats
+          };
+          continue;
+        }
+
+        //  Bounding Box Detection and Initialization
+        if (
+          input.schema?.type === 'object' &&
+          input.schema?.properties?.bbox &&
+          input.schema?.properties?.crs
+        ) {
+          inputValues.value[key] = reactive({
+            bbox: [0, 0, 0, 0],
+            crs: 'EPSG:4326'
+          })
+          continue
+        }
+
+        //  Default Init for other types
         inputValues.value[key] = input.schema?.default ?? (input.schema?.type === 'number' ? 0 : '')
       }
     }
@@ -93,8 +127,30 @@ const convertOutputsToPayload = (outputs: Record<string, any[]>) => {
 watch([inputValues, outputValues, subscriberValues], ([newInputs, newOutputs, newSubscribers]) => {
   console.log('Outputs changed:', newOutputs)
 
+  const formattedInputs: Record<string, any> = {}
+
+  for (const [key, val] of Object.entries(newInputs)) {
+    if (val && typeof val === 'object' && 'mode' in val) {
+      // Handle Complex Input
+      if (val.mode === 'href') {
+        formattedInputs[key] = {
+          href: val.href,
+          type: 'text/plain' // Optional: include type if needed
+        }
+      } else if (val.mode === 'value') {
+        formattedInputs[key] = {
+          value: val.value,
+          format: { mediaType: val.format }
+        }
+      }
+    } else {
+      // Handle simple or literal input
+      formattedInputs[key] = val
+    }
+  }
+
   const payload = {
-    inputs: newInputs,
+    inputs: formattedInputs,
     outputs: convertOutputsToPayload(newOutputs),
     subscriber: {
       successUri: newSubscribers.successUri,
@@ -166,6 +222,23 @@ const submitProcess = async () => {
 
 const isMultipleInput = (input: any) => {
   return input.maxOccurs > 1 ? true : false
+}
+
+const isBoundingBoxInput = (input: any) => {
+  return input.schema?.type === 'object' &&
+         input.schema?.properties?.bbox?.type === 'array' &&
+         input.schema?.properties?.crs?.type === 'string';
+}
+
+const isComplexInput = (input: any) => {
+  return (
+    input?.schema &&
+    (
+      input.schema.contentMediaType ||
+      input.schema.mediaType ||
+      (Array.isArray(input.schema.oneOf) && input.schema.oneOf.some(x => x.contentMediaType))
+    )
+  )
 }
 
 const addInputField = (inputId: string) => {
@@ -247,7 +320,82 @@ const removeInputField = (inputId: string, index: number) => {
                 {{ input.schema?.type || 'text' }}
               </q-badge>
 
-              <template v-if="Array.isArray(inputValues[inputId])">
+              <!-- Complex Input FIRST -->
+              <template v-if="isComplexInput(input)">
+                <q-option-group
+                  v-model="inputValues[inputId].mode"
+                  :options="[
+                    { label: 'Provide URL (href)', value: 'href' },
+                    { label: 'Provide Value Inline', value: 'value' }
+                  ]"
+                  type="radio"
+                  inline
+                  class="q-mb-md"
+                />
+
+                <q-input
+                  v-if="inputValues[inputId].mode === 'href'"
+                  v-model="inputValues[inputId].href"
+                  label="Reference URL (href)"
+                  placeholder="https://example.com/input.json"
+                  filled
+                  dense
+                />
+
+                <q-banner
+                  v-if="inputValues[inputId].mode === 'href' && inputValues[inputId].availableFormats?.length"
+                  class="bg-grey-2 text-black q-mt-sm"
+                >
+                  Supported formats: {{ inputValues[inputId].availableFormats.join(', ') }}
+                </q-banner>
+
+                <div v-if="inputValues[inputId].mode === 'value'" class="q-gutter-md">
+                 <q-select
+                  v-model="inputValues[inputId].format"
+                  :options="inputValues[inputId].availableFormats"
+                  label="Content Format"
+                  dense
+                  filled
+                />
+                  <q-input
+                    v-model="inputValues[inputId].value"
+                    label="Input Value"
+                    type="textarea"
+                    autogrow
+                    filled
+                    dense
+                  />
+                </div>
+              </template>
+
+              <!-- Bounding Box Input -->
+              <template v-else-if="isBoundingBoxInput(input)">
+                <div class="q-gutter-md">
+                  <div class="row q-gutter-sm">
+                    <q-input
+                      v-for="(coord, idx) in ['minX', 'minY', 'maxX', 'maxY']"
+                      :key="idx"
+                      v-model.number="inputValues[inputId].bbox[idx]"
+                      :label="coord"
+                      type="number"
+                      filled
+                      dense
+                      style="flex: 1"
+                    />
+                  </div>
+                  <q-select
+                    v-model="inputValues[inputId].crs"
+                    :options="['EPSG:4326', 'EPSG:3857', 'EPSG:7781']"
+                    label="EPSG Code"
+                    filled
+                    dense
+                    class="q-mt-sm"
+                  />
+                </div>
+              </template>
+
+              <!-- Multiple input array -->
+              <template v-else-if="Array.isArray(inputValues[inputId])">
                 <div v-for="(val, idx) in inputValues[inputId]" :key="idx" class="row items-center q-gutter-sm q-mb-sm">
                   <q-input
                     filled
@@ -272,6 +420,7 @@ const removeInputField = (inputId: string, index: number) => {
                 </div>
               </template>
 
+              <!-- Literal input (no enum) -->
               <template v-else-if="!input.schema?.enum">
                 <q-input
                   filled
@@ -284,6 +433,7 @@ const removeInputField = (inputId: string, index: number) => {
                 />
               </template>
 
+              <!-- Enum input -->
               <template v-else>
                 <q-select
                   filled
