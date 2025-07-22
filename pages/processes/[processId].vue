@@ -17,7 +17,7 @@ const outputValues = ref<Record<string, any>>({})
 const response = ref(null)
 const loading = ref(false)
 const jobStatus = ref('')
-
+const preferMode = ref<'respond-async' | 'respond-sync'>('respond-async')
 const jsonRequestPreview = ref('')
 const showDialog = ref(false)
 
@@ -130,21 +130,19 @@ watch([inputValues, outputValues, subscriberValues], ([newInputs, newOutputs, ne
   const formattedInputs: Record<string, any> = {}
 
   for (const [key, val] of Object.entries(newInputs)) {
-    if (val && typeof val === 'object' && 'mode' in val) {
-      // Handle Complex Input
-      if (val.mode === 'href') {
-        formattedInputs[key] = {
-          href: val.href,
-          type: 'text/plain' // Optional: include type if needed
-        }
-      } else if (val.mode === 'value') {
-        formattedInputs[key] = {
-          value: val.value,
-          format: { mediaType: val.format }
-        }
-      }
+    // If multiple inputs (array)
+    if (Array.isArray(val)) {
+      formattedInputs[key] = val.map(v => typeof v === 'object' && 'mode' in v
+        ? v.mode === 'href'
+          ? { href: v.href }
+          : { value: v.value, format: { mediaType: v.format } }
+        : v
+      )
+    } else if (val && typeof val === 'object' && 'mode' in val) {
+      formattedInputs[key] = val.mode === 'href'
+        ? { href: val.href }
+        : { value: val.value, format: { mediaType: val.format } }
     } else {
-      // Handle simple or literal input
       formattedInputs[key] = val
     }
   }
@@ -203,7 +201,8 @@ const submitProcess = async () => {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${authStore.token.access_token}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Prefer': preferMode.value
       },
       body: JSON.stringify(payload)
     })
@@ -356,7 +355,7 @@ const removeInputField = (inputId: string, index: number) => {
                   label="Content Format"
                   dense
                   filled
-                />
+                  />
                   <q-input
                     v-model="inputValues[inputId].value"
                     label="Input Value"
@@ -364,6 +363,7 @@ const removeInputField = (inputId: string, index: number) => {
                     autogrow
                     filled
                     dense
+                    class="resizable-textarea"
                   />
                 </div>
               </template>
@@ -568,7 +568,14 @@ const removeInputField = (inputId: string, index: number) => {
             </div>
           </q-card>
         </div>
-
+          <q-select
+            v-model="preferMode"
+            :options="['async', 'sync']"
+            label="Execution Mode"
+            filled
+            dense
+            class="q-mb-md"
+          />
         <div class="q-mt-md row q-gutter-sm">
           <q-btn label="Submit" type="submit" color="primary" />
           <q-btn color="primary" outline label="Show JSON Preview" @click="showDialog = true" />
