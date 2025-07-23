@@ -383,7 +383,7 @@ const removeInputField = (inputId: string, index: number) => {
                   </div>
                   <q-select
                     v-model="inputValues[inputId].crs"
-                    :options="['EPSG:4326', 'EPSG:3857', 'EPSG:7781']"
+                    :options="EPSG_CODES"
                     label="EPSG Code"
                     filled
                     dense
