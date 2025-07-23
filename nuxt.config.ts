@@ -31,7 +31,24 @@ export default defineNuxtConfig({
     vue: {
         compilerOptions: {}
     },
-    modules: ["@pinia/nuxt", "nuxt-quasar-ui", "@sidebase/nuxt-auth"],
+    modules: ["@pinia/nuxt", "nuxt-quasar-ui", "@sidebase/nuxt-auth","@nuxtjs/i18n"],
+
+    i18n: {
+        langDir: 'locales',
+        locales: [
+          { code: 'en', iso: 'en-US', file: 'en.json', name: 'English' },
+          { code: 'fr', iso: 'fr-FR', file: 'fr.json', name: 'Française' }
+        ],
+        defaultLocale: 'en',
+        lazy: true,
+        strategy: 'no_prefix', // 'no_prefix' used to keep URLs clean. Language switching is handled via cookies and UI. SEO impact is minimal for internal app.
+        detectBrowserLanguage: {
+          useCookie: true,
+          cookieKey: 'i18n_redirected',
+          fallbackLocale: 'en',
+        }
+      },
+      
 
     auth: {
         isEnabled: true,

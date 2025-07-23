@@ -1,12 +1,35 @@
 <template>
-  <NuxtRouteAnnouncer/>
-  <NuxtLayout>
-    <NuxtPage/>
-  </NuxtLayout>
+  <component :is="layoutComponent" />
 </template>
-<script setup lang="ts">
 
+<script setup lang="ts">
+import { computed } from 'vue'
+import { useLayoutStore } from '~/stores/layout'
+import { useI18n } from 'vue-i18n'
+import { useCookie } from '#app'
+
+
+import DefaultLayout from '~/layouts/Default.vue'
+import QuasarLayout from '~/layouts/quasar.vue'
+
+const layoutStore = useLayoutStore()
+
+const layoutComponent = computed(() => {
+  const map: Record<string, any> = {
+    Default: DefaultLayout,
+    quasar: QuasarLayout,
+  }
+  return map[layoutStore.currentLayout] || DefaultLayout
+})
+
+// i18n locale from cookie
+const { locale } = useI18n()
+const langCookie = useCookie('i18n_redirected')
+if (langCookie.value && langCookie.value !== locale.value) {
+  locale.value = langCookie.value
+}
 </script>
+
 
 <style>
 .q-card,

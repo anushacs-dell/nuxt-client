@@ -2,12 +2,16 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useRuntimeConfig } from '#imports'
+import { useI18n } from 'vue-i18n'
+
 const {
   params: { processId }
 } = useRoute()
 
 const authStore = useAuthStore()
+const { locale, t } = useI18n()
 const config = useRuntimeConfig()
+
 
 const data = ref(null)
 const inputValues = ref<Record<string, any>>({})
@@ -25,12 +29,26 @@ const subscriberValues = ref({
   failedUri: 'http://zookernel/cgi-bin/publish.py?jobid=JOBSOCKET-83dcc87e-55a7-11f0-abed-0242ac106a07&type=failed'
 })
 
+function initializeInputValues(inputs: Record<string, any>): Record<string, any> {
+  const values: Record<string, any> = {}
+  for (const [key, input] of Object.entries(inputs)) {
+    if (input.type === 'BoundingBoxData') {
+      values[key] = { minx: 0, miny: 0, maxx: 0, maxy: 0 }
+    } else if (input.type === 'ComplexData') {
+      values[key] = ''
+    } else {
+      values[key] = input.schema?.default ?? (input.schema?.type === 'number' ? 0 : '')
+    }
+  }
+  return values
+}
 
 const fetchData = async () => {
   try {
     data.value = await $fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/processes/${processId}`, {
       headers: {
-        Authorization: `Bearer ${authStore.token.access_token}`
+        Authorization: `Bearer ${authStore.token.access_token}`,
+        'Accept-Language': locale.value
       }
     })
 
@@ -73,10 +91,11 @@ const fetchData = async () => {
         inputValues.value[key] = input.schema?.default ?? (input.schema?.type === 'number' ? 0 : '')
       }
     }
+
     if (data.value && data.value.outputs) {
       for (const [key, input] of Object.entries(data.value.outputs)) {
         if(input.schema.oneOf?.length > 0){
-          const myEnum=[];
+          const myEnum=[]
           for(var i=0;i<input.schema.oneOf.length;i++){
             if(input.schema.oneOf[i].type=="object")
               myEnum.push("application/json")
@@ -98,14 +117,13 @@ onMounted(() => {
   fetchData()
 })
 
+
+
 const convertOutputsToPayload = (outputs: Record<string, any[]>) => {
   const result: Record<string, any> = {}
-  
   for (const [key, outputArray] of Object.entries(outputs)) {
     if (outputArray && outputArray.length > 0) {
       const outputConfig: any = {}
-      
-      // Parcourir chaque élément du tableau
       outputArray.forEach(item => {
         if (item.id === 'transmission') {
           outputConfig.transmissionMode = item.cval
@@ -115,7 +133,6 @@ const convertOutputsToPayload = (outputs: Record<string, any[]>) => {
           }
         }
       })
-      
       result[key] = outputConfig
     }
   }
@@ -123,7 +140,28 @@ const convertOutputsToPayload = (outputs: Record<string, any[]>) => {
 }
 
 watch([inputValues, outputValues, subscriberValues], ([newInputs, newOutputs, newSubscribers]) => {
-  console.log('Outputs changed:', newOutputs)
+  const wrappedInputs = Object.fromEntries(
+    Object.entries(newInputs).map(([key, val]) => {
+      const inputType = data.value?.inputs?.[key]?.type
+
+      if (inputType === 'ComplexData') {
+        return [key, { href: val }]
+      }
+
+      if (inputType === 'BoundingBoxData') {
+        return [key, {
+          bbox: {
+            lowerCorner: [val.minx, val.miny],
+            upperCorner: [val.maxx, val.maxy],
+            crs: 'http://www.opengis.net/def/crs/OGC/1.3/CRS84'
+          },
+          crs: 'urn:ogc:def:crs:EPSG:6.6:4326'
+        }]
+      }
+
+      return [key, typeof val === 'object' ? { value: val } : val]
+    })
+  )
 
   const formattedInputs: Record<string, any> = {}
 
@@ -154,13 +192,15 @@ watch([inputValues, outputValues, subscriberValues], ([newInputs, newOutputs, ne
       failedUri: newSubscribers.failedUri
     }
   }
+
   jsonRequestPreview.value = JSON.stringify(payload, null, 2)
 }, { deep: true })
 
 const pollJobStatus = async (jobId: string) => {
   const jobUrl = `${config.public.NUXT_ZOO_BASEURL}/ogc-api/jobs/${jobId}`
   const headers = {
-    Authorization: `Bearer ${authStore.token.access_token}`
+    Authorization: `Bearer ${authStore.token.access_token}`,
+    'Accept-Language': locale.value
   }
 
   while (true) {
@@ -200,6 +240,7 @@ const submitProcess = async () => {
       headers: {
         Authorization: `Bearer ${authStore.token.access_token}`,
         'Content-Type': 'application/json',
+        'Accept-Language': locale.value
         'Prefer': preferMode.value
       },
       body: JSON.stringify(payload)
@@ -250,9 +291,8 @@ const removeInputField = (inputId: string, index: number) => {
     inputValues.value[inputId].splice(index, 1)
   }
 }
-
-
 </script>
+
 
 <template>
   <q-page class="q-pa-md">
@@ -270,15 +310,44 @@ const removeInputField = (inputId: string, index: number) => {
 
       <!-- <h4>{{ data.id }} - {{ data.description }}</h4> -->
 
-      <q-form @submit.prevent="submitProcess">
+<q-form @submit.prevent="submitProcess">
+  <div class="q-mb-lg">
+    <div class="text-h4 text-weight-bold text-primary q-mb-sm">
+      {{ t('Inputs') }}
+    </div>
+    <q-separator class="q-mt-md" />
+  </div>
 
-        <div class="q-mb-lg">
-          <div class="text-h4 text-weight-bold text-primary q-mb-sm">
-            Inputs
-          </div>
-          <q-separator class="q-mt-md" />
-        </div>
-
+  <div v-for="(input, inputId) in data.inputs" :key="inputId" class="q-mb-md">
+    <q-card class="q-pa-md">
+      <div class="row items-center q-mb-sm">
+        <div class="text-blue text-bold">{{ inputId.toUpperCase() }}</div>
+        <q-space />
+        <q-btn 
+          v-if="isMultipleInput(input)"
+          round 
+          dense 
+          flat 
+          icon="add" 
+          color="primary" 
+          size="sm"
+          @click="addInputField(inputId)"
+        >
+          <q-tooltip>{{ t('Add another value') }}</q-tooltip>
+        </q-btn>
+        <q-btn 
+          v-if="isMultipleInput(input)"
+          round 
+          dense 
+          flat 
+          icon="delete" 
+          color="primary" 
+          size="sm"
+          @click="removeInputField(inputId)"
+        >
+          <q-tooltip>{{ t('Delete the last value') }}</q-tooltip>
+        </q-btn>
+      </div>
         <div v-for="(input, inputId) in data.inputs" :key="inputId" class="q-mb-md">
           <q-card class="q-pa-md">
               <div class="row items-center q-mb-sm">
@@ -446,49 +515,75 @@ const removeInputField = (inputId: string, index: number) => {
             </div>
           </q-card>
 
+      <div class="q-gutter-sm row items-center">
+        <q-badge color="grey-3" text-color="black">
+          {{ input.type }}
+        </q-badge>
+
+        <!-- LiteralData -->
+        <q-input
+          v-if="input.type === 'LiteralData' && !input.schema?.enum"
+          filled
+          v-model="inputValues[inputId]"
+          :type="input.schema?.type === 'number' ? 'number' : 'text'"
+          :label="input.title || inputId"
+          dense
+          class="q-ml-sm"
+          style="flex: 1"
+        />
+
+        <q-select
+          v-else-if="input.type === 'LiteralData' && input.schema?.enum"
+          filled
+          v-model="inputValues[inputId]"
+          :options="input.schema.enum"
+          :label="input.title || inputId"
+          dense
+          class="q-ml-sm"
+          style="flex: 1"
+        />
+
+        <!-- ComplexData -->
+        <q-input
+          v-else-if="input.type === 'ComplexData'"
+          filled
+          type="textarea"
+          v-model="inputValues[inputId]"
+          :label="input.title || inputId"
+          autogrow
+          dense
+          class="q-ml-sm"
+          style="flex: 1"
+        />
+
+        <!-- BoundingBoxData -->
+        <div v-else-if="input.type === 'BoundingBoxData'" class="q-ml-sm row q-gutter-sm" style="flex: 1;">
+          <q-input v-model="inputValues[inputId].minx" type="number" label="Min X" dense style="width: 100px" />
+          <q-input v-model="inputValues[inputId].miny" type="number" label="Min Y" dense style="width: 100px" />
+          <q-input v-model="inputValues[inputId].maxx" type="number" label="Max X" dense style="width: 100px" />
+          <q-input v-model="inputValues[inputId].maxy" type="number" label="Max Y" dense style="width: 100px" />
         </div>
 
-        <div class="q-mb-lg">
-          <div class="text-h4 text-weight-bold text-primary q-mb-sm">
-            Outputs
-          </div>
-          <q-separator class="q-mt-md" />
-        </div>
+        <!-- Fallback -->
+        <q-input
+          v-else
+          filled
+          v-model="inputValues[inputId]"
+          :label="input.title || inputId"
+          dense
+          class="q-ml-sm"
+          style="flex: 1"
+        />
+      </div>
+    </q-card>
+  </div>
 
-        <div v-for="(output, outputId) in data.outputs" :key="outputId" class="q-mb-md">
-          <q-card class="q-pa-md">
-              <div class="row items-center q-mb-sm">
-                <div class="text-blue text-bold">{{ outputId.toUpperCase() }}</div>
-                <q-space />
-              </div>
-              <q-select
-                filled
-                v-if="outputValues[outputId].length > 1"
-                v-model="outputValues[outputId][1].cval"
-                :options="outputValues[outputId][1].enum"
-                label="Format"
-                dense
-                class="q-ml-sm"
-                style="flex: 1"
-              >
-                <template v-slot:prepend>
-                  <q-icon name="description" color="blue" />
-                </template>
-              </q-select>
-              <q-select
-                filled
-                v-if="outputValues[outputId].length > 0"
-                v-model="outputValues[outputId][0].cval"
-                :options="outputValues[outputId][0].enum"
-                label="Transmission"
-                dense
-                class="q-ml-sm"
-                style="flex: 1"
-              >
-              </q-select>
+  <div class="q-mt-md row q-gutter-sm">
+    <q-btn :label="t('Submit')" type="submit" color="primary" />
+    <q-btn color="primary" outline :label="t('Show JSON Preview')" @click="showDialog = true" />
+  </div>
 
-          </q-card>
-        </div>
+</q-form>
 
         <div class="q-mb-md">
           <q-card class="q-pa-md">
@@ -583,16 +678,16 @@ const removeInputField = (inputId: string, index: number) => {
       <q-dialog v-model="showDialog" persistent>
         <q-card style="min-width: 70vw; max-width: 90vw;">
           <q-card-section>
-            <div class="text-h6">Execute Request Confirmation</div>
+            <div class="text-h6">{{ t('Execute Request Confirmation') }}</div>
           </q-card-section>
 
           <q-card-section class="q-pt-none">
             <q-banner dense class="bg-grey-2 text-black q-pa-sm">
-              This is the full request that will be sent to the Execute endpoint:
+             {{ t('This is the full request that will be sent to the Execute endpoint:') }}
             </q-banner>
             <q-input
               v-model="jsonRequestPreview"
-              label="execute request"
+              :label="t('Execute request')"
               type="textarea"
               @change="jsonRequestPreview = $event.target.value"
               required
@@ -605,7 +700,7 @@ const removeInputField = (inputId: string, index: number) => {
           <q-card-actions align="right">
             <q-btn flat label="Cancel" color="primary" v-close-popup />
             <q-btn
-              label="Submit Request"
+              :label="t('Submit Request')"
               color="primary"
               :loading="loading"
               @click="() => { showDialog = false; submitProcess() }"
@@ -616,13 +711,13 @@ const removeInputField = (inputId: string, index: number) => {
 
       <div class="q-mt-md" v-if="loading">
         <q-linear-progress indeterminate color="primary" />
-        <div class="text-caption text-primary q-mt-sm">Execution in progress... Status: {{ jobStatus }}</div>
+        <div class="text-caption text-primary q-mt-sm">{{ t('Execution in progress...') }} {{ t('Status') }}: {{ jobStatus }}</div>
       </div>
 
       <div class="q-mt-lg" v-if="response">
-        <h6>Execution Response</h6>
+        <h6>{{ t('Execution Response') }}</h6>
         <details>
-          <summary class="text-primary text-bold cursor-pointer">Show Raw JSON</summary>
+          <summary class="text-primary text-bold cursor-pointer">{{t('Show Raw JSON')}}</summary>
           <pre>{{ JSON.stringify(response, null, 2) }}</pre>
         </details>
       </div>

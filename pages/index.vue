@@ -3,20 +3,20 @@
     <div class="row justify-center">
       <div class="col-12" style="max-width: 900px;">
 
-        <p class="text-h4 q-mb-md text-weight-bold">Home</p>
+        <p class="text-h4 q-mb-md text-weight-bold">{{ t('Home') }}</p>
 
         <q-card v-if="apiInfo" class="q-pa-md q-mb-lg">
           <q-card-section>
             <div class="text-h6">{{ apiInfo.title }}</div>
-            <div class="text-subtitle2">Version: {{ apiInfo.version }}</div>
+            <div class="text-subtitle2">{{ t('Version') }}: {{ apiInfo.version }}</div>
             <div class="q-mt-sm">{{ apiInfo.description }}</div>
 
             <div class="q-mt-sm">
-              Contact: {{ apiInfo.contact?.name }} ({{ apiInfo.contact?.email }})
+              {{ t('Contact') }}: {{ apiInfo.contact?.name }} ({{ apiInfo.contact?.email }})
             </div>
 
             <div class="q-mt-sm" v-if="apiInfo.license">
-              License:
+              {{ t('License') }}:
               <a
                 :href="apiInfo.license.url"
                 target="_blank"
@@ -28,7 +28,7 @@
             </div>
 
             <div class="q-mt-md" v-if="apiInfo['x-keywords']">
-              <div class="text-subtitle2 q-mb-xs">Keywords:</div>
+              <div class="text-subtitle2 q-mb-xs">{{ t('Keywords') }}:</div>
               <q-chip
                 v-for="(kw, i) in apiInfo['x-keywords']"
                 :key="i"
@@ -42,18 +42,18 @@
             </div>
 
             <div class="q-mt-md" v-if="apiInfo['x-ows-servicecontact']">
-              <div class="text-subtitle2 q-mb-xs">Service Contact:</div>
-              <div class="q-mt-sm">Name: {{ apiInfo['x-ows-servicecontact'].individualName }}</div>
-              <div class="q-mt-sm">Organization: {{ apiInfo['x-ows-servicecontact'].providerName }}</div>
+              <div class="text-subtitle2 q-mb-xs">{{ t('Service Contact') }}:</div>
+              <div class="q-mt-sm">{{ t('Name') }}: {{ apiInfo['x-ows-servicecontact'].individualName }}</div>
+              <div class="q-mt-sm">{{ t('Organization') }}: {{ apiInfo['x-ows-servicecontact'].providerName }}</div>
               <div class="q-mt-sm">
-                Email:
+                {{ t('Email') }}:
                 <a :href="`mailto:${apiInfo['x-ows-servicecontact'].addressElectronicMailAddress}`"
                    class="text-primary">
                   {{ apiInfo['x-ows-servicecontact'].addressElectronicMailAddress }}
                 </a>
               </div>
               <div class="q-mt-sm">
-                Address:
+                {{ t('Address') }}:
                 {{ apiInfo['x-ows-servicecontact'].addressDeliveryPoint }},
                 {{ apiInfo['x-ows-servicecontact'].addressCity }} -
                 {{ apiInfo['x-ows-servicecontact'].addressPostalCode }},
@@ -65,10 +65,11 @@
 
               <q-card v-if="landingLinks.length" class="q-pa-md q-mb-md">
           <q-card-section>
-            <div class="text-h6">Available Links</div>
+            <div class="text-h6">{{ t('Available Links') }}</div>
 
             <div v-for="(links, title) in groupedLinks" :key="title" class="q-mb-md">
               <div class="text-subtitle1 q-mb-xs">{{ title }}</div>
+
               <q-list separator>
                 <q-item
                   v-for="(link, idx) in links"
@@ -97,10 +98,12 @@
 
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRuntimeConfig } from '#imports'
+import { useI18n } from 'vue-i18n'
 
-const authStore = useAuthStore()
+const { locale, t } = useI18n()
+
 const landingLinks = ref<any[]>([])
 const apiInfo = ref<any>(null)
 const loading = ref(false)
@@ -112,22 +115,17 @@ const apiSpecUrl = `${config.public.NUXT_ZOO_BASEURL}/ogc-api/api`
 const fetchLandingAndApiInfo = async () => {
   loading.value = true
   try {
-    const landingRes = await $fetch(landingUrl, {
-      headers: {
-        Authorization: `Bearer ${authStore.token.access_token}`
-      }
-    })
+    const headers = {
+      'Accept-Language': locale.value
+    }
+    
+    const landingRes = await $fetch(landingUrl, { headers })
     landingLinks.value = landingRes.links || []
 
-    const apiRes = await $fetch(apiSpecUrl)
+    const apiRes = await $fetch(apiSpecUrl, { headers })
     apiInfo.value = apiRes.info || {}
   } catch (err) {
     console.error('Error loading homepage data:', err)
-    const landingRes = await $fetch(landingUrl)
-    landingLinks.value = landingRes.links || []
-
-    const apiRes = await $fetch(apiSpecUrl)
-    apiInfo.value = apiRes.info || {}
   } finally {
     loading.value = false
   }
@@ -147,21 +145,22 @@ const groupedLinks = computed(() => {
   return groups
 })
 
+
 const getReadableLinkText = (link: any): string => {
   const href = link.href || ''
 
-  if (href.endsWith('/ogc-api/')) return 'View this document in JSON.'
-  if (href.endsWith('/ogc-api/index.html')) return 'View the alternative version in HTML.'
-  if (href.endsWith('/ogc-api/api')) return 'View the service description.'
-  if (href.endsWith('/ogc-api/api.html')) return 'View service documentation.'
-  if (href.endsWith('/ogc-api/conformance')) return 'View the conformance classes that the link\'s context conforms to.'
-  if (href.endsWith('/ogc-api/conformance.html')) return 'View the alternative version in HTML.'
-  if (href.endsWith('/ogc-api/processes')) return 'View the list of processes the API offers.'
-  if (href.endsWith('/ogc-api/processes.html')) return 'View the alternative version in HTML.'
-  if (href.endsWith('/ogc-api/jobs')) return 'View the list of job available on this server.'
-  if (href.endsWith('/ogc-api/jobs.html')) return 'View the alternative version in HTML.'
+ if (href.endsWith('/ogc-api/')) return t('View this document in JSON.')
+  if (href.endsWith('/ogc-api/index.html')) return t('View the alternative version in HTML.')
+  if (href.endsWith('/ogc-api/api')) return t('View the service description.')
+  if (href.endsWith('/ogc-api/api.html')) return t('View service documentation.')
+  if (href.endsWith('/ogc-api/conformance')) return t('View the conformance classes that the link\'s context conforms to.')
+  if (href.endsWith('/ogc-api/conformance.html')) return t('View the alternative version in HTML.')
+  if (href.endsWith('/ogc-api/processes')) return t('View the list of processes the API offers.')
+  if (href.endsWith('/ogc-api/processes.html')) return t('View the alternative version in HTML.')
+  if (href.endsWith('/ogc-api/jobs')) return t('View the list of job available on this server.')
+  if (href.endsWith('/ogc-api/jobs.html')) return t('View the alternative version in HTML.')
 
-  return 'View link'
+  return t('View Link')
 }
 
 

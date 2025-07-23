@@ -2,26 +2,26 @@
   <q-page class="q-pa-md">
     <div class="row justify-center">
       <div class="col-12" style="max-width: 1000px;">
-        <p class="text-h4 q-mb-md text-weight-bold text-primary">Job Details</p>
+        <p class="text-h4 q-mb-md text-weight-bold text-primary">{{t('Job Details')}}</p>
         <q-separator class="q-mb-md" />
 
         <q-card v-if="jobData" class="q-pa-md">
           <q-card-section>
             <div class="text-subtitle1 q-mb-sm">
               <q-icon name="work" class="q-mr-sm" />
-              <span><strong>Job ID:</strong> {{ jobData.jobID }}</span>
+              <span><strong>{{ t('Job ID') }}:</strong> {{ jobData.jobID }}</span>
             </div>
 
             <q-separator class="q-my-md" />
 
-            <div class="q-mb-sm"><strong>Process ID:</strong> {{ jobData.processID }}</div>
+            <div class="q-mb-sm"><strong>{{ t('Process ID') }}:</strong> {{ jobData.processID }}</div>
             <div class="row items-center justify-between q-mb-sm">
-              <div><strong>Status:</strong> {{ jobData.status }}</div>
+              <div><strong>{{ t('Status') }}:</strong> {{ jobData.status }}</div>
               <div v-if="jobData.links && jobData.links.length" style="width: 250px;">
                 <q-select
                   filled
                   dense
-                  label="Job Link"
+                  :label="t('Job Link')"
                   v-model="selectedLink"
                   :options="linkOptions"
                   option-label="label"
@@ -33,11 +33,11 @@
               </div>
             </div>
 
-            <div class="q-mb-md"><strong>Created:</strong> {{ jobData.created }}</div>
+            <div class="q-mb-md"><strong>{{t('Created')}}:</strong> {{ jobData.created }}</div>
 
             <div v-if="jobData.status === 'running'" class="q-mt-md">
               <div class="q-mb-sm">
-                <strong>Progress:</strong> {{ jobData.progress ?? 0 }}%
+                <strong>{{t('Progress')}}:</strong> {{ jobData.progress ?? 0 }}%
                 <q-linear-progress
                   color="primary"
                   :value="(jobData.progress ?? 0) / 100"
@@ -48,14 +48,14 @@
               </div>
 
               <div class="q-mb-sm">
-                <strong>Message:</strong> {{ jobData.message || 'Processing...' }}
+                <strong>{{ t('Message') }}:</strong> {{ jobData.message || 'Processing...' }}
               </div>
             </div>
 
 
             <div v-if="jobData.jobID" class="q-mt-md">
                 <a :href="`${config.public.NUXT_ZOO_BASEURL}/ogc-api/jobs/${jobData.jobID}/results`" target="_blank">
-                  View Full Result JSON
+                  {{t('View Full Result JSON')}}
                 </a>
             </div>
           </q-card-section>
@@ -82,16 +82,16 @@
     <q-dialog v-model="showModal" persistent>
       <q-card style="min-width: 600px; max-width: 90vw;">
         <q-card-section class="row items-center q-pb-none">
-          <div class="text-h6">Link Content</div>
+          <div class="text-h6">{{ t('Link Content') }}</div>
           <q-space />
           <q-btn icon="close" flat round dense @click="showModal = false" />
         </q-card-section>
 
         <q-card-section>
           <div v-if="modalContent">
-            <pre style="max-width:100%;max-height:250px;overflow:auto;">{{ modalContent }}</pre>
+            <pre>{{ modalContent }}</pre>
           </div>
-          <div v-else class="text-negative">No data or failed to fetch.</div>
+          <div v-else class="text-negative">{{ t('No data or failed to fetch') }}</div>
         </q-card-section>
       </q-card>
     </q-dialog>
@@ -103,6 +103,8 @@ import { useRoute } from 'vue-router'
 import { ref, onMounted, onBeforeUnmount, computed, nextTick, watch } from 'vue'
 import { useRuntimeConfig } from '#imports'
 import { useAuthStore } from '~/stores/auth'
+import { useI18n } from 'vue-i18n'
+
 
 import Map from 'ol/Map'
 import View from 'ol/View'
@@ -115,6 +117,8 @@ import VectorLayer from 'ol/layer/Vector'
 const route = useRoute()
 const config = useRuntimeConfig()
 const authStore = useAuthStore()
+const { locale, t } = useI18n()
+
 
 const jobId = route.params.jobId
 const jobData = ref<any>(null)
@@ -130,6 +134,8 @@ onMounted(() => {
   fetchJobDetails()
   intervalId = setInterval(fetchJobDetails, 3000)
 })
+
+
 
 onBeforeUnmount(() => {
   clearInterval(intervalId)
@@ -167,6 +173,7 @@ const fetchJobDetails = async () => {
     const response = await $fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/jobs/${jobId}`, {
       headers: {
         Authorization: `Bearer ${authStore.token.access_token}`,
+        'Accept-Language': locale.value
       },
     })
     jobData.value = response
@@ -193,6 +200,7 @@ const fetchLinkContent = async (href: string) => {
     const response = await $fetch(href, {
       headers: {
         Authorization: `Bearer ${authStore.token.access_token}`,
+        'Accept-Language': locale.value
       },
     })
 
