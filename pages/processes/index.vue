@@ -10,13 +10,13 @@ const router = useRouter()
 const modalContent = ref('')
 const showModal = ref(false)
 const toDisplayString = ref('')
- 
+
 import { QCard, QCardSection, QInput, QBtn, QDialog, QForm, QUploader, QSpinnerGears, Notify } from 'quasar';
- 
+
 const viewProcess = (row: any) => {
   router.push(`/processes/${row.id}`)
 }
- 
+
 const packageProcess = async (row: any) => {
     try {
       const response = await fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/processes/${row.id}/package`, {
@@ -38,6 +38,7 @@ const packageProcess = async (row: any) => {
       console.error('Application Package request failed', error)
       showModal.value = false
     }
+
 }
 
 const isConformToCwl = ref(false)
@@ -57,7 +58,7 @@ const checkConformance = async () => {
       const conformance = await response.json()
       console.log('Conformance response:', conformance)
 
-      // DRU Supported?
+      // Vérifier si l'API supporte le déploiement CWL
       const cwlConformanceUrl = 'http://www.opengis.net/spec/ogcapi-processes-2/1.0/conf/deploy-replace-undeploy'
       isConformToCwl.value = conformance.conformsTo?.includes(cwlConformanceUrl) || false
 
@@ -198,12 +199,12 @@ const fetchData = async () => {
     console.error('Error fetching data:', error)
   }
 }
- 
+
 onMounted(() => {
   checkConformance()
   fetchData()
 })
- 
+
 const columns = [
   { name: 'id', label: '#', field: 'id', align: 'left', sortable: true },
   { name: 'description', label: 'Description', field: 'description', align: 'left', sortable: true },
@@ -215,7 +216,7 @@ const columns = [
     sortable: false
   }
 ]
- 
+
 const rows = computed(() => {
   if (!data.value?.processes) return []
   const term = filter.value.toLowerCase()
@@ -225,16 +226,16 @@ const rows = computed(() => {
     return idMatch || descMatch
   })
 })
- 
+
 const formattedData = computed(() => JSON.stringify(data.value, null, 2))
- 
+
 const onClearSearch = async () => {
   filter.value = ''
   await fetchData()
 }
- 
+
 </script>
- 
+
 <template>
   <q-page class="q-pa-sm">
     <div class="row justify-center">
@@ -249,7 +250,7 @@ const onClearSearch = async () => {
           :loading="isCheckingConformance"
         />
         <q-separator />
- 
+
         <div class="q-mb-md">
           <q-input
             filled
@@ -261,7 +262,7 @@ const onClearSearch = async () => {
             @clear="onClearSearch"
           />
         </div>
- 
+
         <q-table
           title="Processes List"
           :rows="rows"
@@ -287,12 +288,11 @@ const onClearSearch = async () => {
             </q-td>
           </template>
         </q-table>
- 
+
         <q-separator />
- 
+
       </div>
     </div>
-
 
     <q-dialog v-model="dialog" persistent>
       <q-card style="min-width: 800px; max-width: 90vw;">

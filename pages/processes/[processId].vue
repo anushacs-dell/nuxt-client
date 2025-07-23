@@ -2,7 +2,6 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useRuntimeConfig } from '#imports'
-
 const {
   params: { processId }
 } = useRoute()
@@ -16,7 +15,7 @@ const outputValues = ref<Record<string, any>>({})
 const response = ref(null)
 const loading = ref(false)
 const jobStatus = ref('')
-
+const preferMode = ref<'respond-async' | 'respond-sync'>('respond-async')
 const jsonRequestPreview = ref('')
 const showDialog = ref(false)
 
@@ -38,6 +37,39 @@ const fetchData = async () => {
     if (data.value && data.value.inputs) {
       for (const [key, input] of Object.entries(data.value.inputs)) {
         console.log(input)
+        console.log('isComplexInput:', input, isComplexInput(input))
+
+        if (
+          input?.schema?.contentMediaType ||
+          input?.schema?.mediaType ||
+          (input?.schema?.oneOf?.some(f => f.contentMediaType))
+        ) {
+          const supportedFormats = input.schema.oneOf?.map(f => f.contentMediaType) || DEFAULT_SUPPORTED_FORMATS;
+
+          inputValues.value[key] = {
+            mode: 'href',
+            href: '',
+            value: '',
+            format: supportedFormats[0],
+            availableFormats: supportedFormats
+          };
+          continue;
+        }
+
+        //  Bounding Box Detection and Initialization
+        if (
+          input.schema?.type === 'object' &&
+          input.schema?.properties?.bbox &&
+          input.schema?.properties?.crs
+        ) {
+          inputValues.value[key] = reactive({
+            bbox: [0, 0, 0, 0],
+            crs: 'EPSG:4326'
+          })
+          continue
+        }
+
+        //  Default Init for other types
         inputValues.value[key] = input.schema?.default ?? (input.schema?.type === 'number' ? 0 : '')
       }
     }
@@ -93,8 +125,28 @@ const convertOutputsToPayload = (outputs: Record<string, any[]>) => {
 watch([inputValues, outputValues, subscriberValues], ([newInputs, newOutputs, newSubscribers]) => {
   console.log('Outputs changed:', newOutputs)
 
+  const formattedInputs: Record<string, any> = {}
+
+  for (const [key, val] of Object.entries(newInputs)) {
+    // If multiple inputs (array)
+    if (Array.isArray(val)) {
+      formattedInputs[key] = val.map(v => typeof v === 'object' && 'mode' in v
+        ? v.mode === 'href'
+          ? { href: v.href }
+          : { value: v.value, format: { mediaType: v.format } }
+        : v
+      )
+    } else if (val && typeof val === 'object' && 'mode' in val) {
+      formattedInputs[key] = val.mode === 'href'
+        ? { href: val.href }
+        : { value: val.value, format: { mediaType: val.format } }
+    } else {
+      formattedInputs[key] = val
+    }
+  }
+
   const payload = {
-    inputs: newInputs,
+    inputs: formattedInputs,
     outputs: convertOutputsToPayload(newOutputs),
     subscriber: {
       successUri: newSubscribers.successUri,
@@ -147,7 +199,8 @@ const submitProcess = async () => {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${authStore.token.access_token}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Prefer': preferMode.value
       },
       body: JSON.stringify(payload)
     })
@@ -166,6 +219,23 @@ const submitProcess = async () => {
 
 const isMultipleInput = (input: any) => {
   return input.maxOccurs > 1 ? true : false
+}
+
+const isBoundingBoxInput = (input: any) => {
+  return input.schema?.type === 'object' &&
+         input.schema?.properties?.bbox?.type === 'array' &&
+         input.schema?.properties?.crs?.type === 'string';
+}
+
+const isComplexInput = (input: any) => {
+  return (
+    input?.schema &&
+    (
+      input.schema.contentMediaType ||
+      input.schema.mediaType ||
+      (Array.isArray(input.schema.oneOf) && input.schema.oneOf.some(x => x.contentMediaType))
+    )
+  )
 }
 
 const addInputField = (inputId: string) => {
@@ -242,33 +312,137 @@ const removeInputField = (inputId: string, index: number) => {
               </div>
 
             <!-- <div class="text-blue text-bold q-mb-sm">{{ inputId.toUpperCase() }}</div> -->
-            <div class="q-gutter-sm row items-center">
-              <q-badge color="grey-3" text-color="black">
+            <div class="q-gutter-sm">
+              <q-badge color="grey-3" text-color="black" class="q-mb-sm">
                 {{ input.schema?.type || 'text' }}
               </q-badge>
 
- 
-              <q-input
-                v-if="!input.schema?.enum"
-                filled
-                v-model="inputValues[inputId]"
-                :type="input.schema?.type === 'number' ? 'number' : 'text'"
-                :label="input.title || inputId"
-                dense
-                class="q-ml-sm"
-                style="flex: 1"
-              />
+              <!-- Complex Input FIRST -->
+              <template v-if="isComplexInput(input)">
+                <q-option-group
+                  v-model="inputValues[inputId].mode"
+                  :options="[
+                    { label: 'Provide URL (href)', value: 'href' },
+                    { label: 'Provide Value Inline', value: 'value' }
+                  ]"
+                  type="radio"
+                  inline
+                  class="q-mb-md"
+                />
 
-              <q-select
-                v-else
-                filled
-                v-model="inputValues[inputId]"
-                :options="input.schema.enum"
-                :label="input.title || inputId"
-                dense
-                class="q-ml-sm"
-                style="flex: 1"
-              />
+                <q-input
+                  v-if="inputValues[inputId].mode === 'href'"
+                  v-model="inputValues[inputId].href"
+                  label="Reference URL (href)"
+                  placeholder="https://example.com/input.json"
+                  filled
+                  dense
+                />
+
+                <q-banner
+                  v-if="inputValues[inputId].mode === 'href' && inputValues[inputId].availableFormats?.length"
+                  class="bg-grey-2 text-black q-mt-sm"
+                >
+                  Supported formats: {{ inputValues[inputId].availableFormats.join(', ') }}
+                </q-banner>
+
+                <div v-if="inputValues[inputId].mode === 'value'" class="q-gutter-md">
+                 <q-select
+                  v-model="inputValues[inputId].format"
+                  :options="inputValues[inputId].availableFormats"
+                  label="Content Format"
+                  dense
+                  filled
+                  />
+                  <q-input
+                    v-model="inputValues[inputId].value"
+                    label="Input Value"
+                    type="textarea"
+                    autogrow
+                    filled
+                    dense
+                    class="resizable-textarea"
+                  />
+                </div>
+              </template>
+
+              <!-- Bounding Box Input -->
+              <template v-else-if="isBoundingBoxInput(input)">
+                <div class="q-gutter-md">
+                  <div class="row q-gutter-sm">
+                    <q-input
+                      v-for="(coord, idx) in ['minX', 'minY', 'maxX', 'maxY']"
+                      :key="idx"
+                      v-model.number="inputValues[inputId].bbox[idx]"
+                      :label="coord"
+                      type="number"
+                      filled
+                      dense
+                      style="flex: 1"
+                    />
+                  </div>
+                  <q-select
+                    v-model="inputValues[inputId].crs"
+                    :options="EPSG_CODES"
+                    label="EPSG Code"
+                    filled
+                    dense
+                    class="q-mt-sm"
+                  />
+                </div>
+              </template>
+
+              <!-- Multiple input array -->
+              <template v-else-if="Array.isArray(inputValues[inputId])">
+                <div v-for="(val, idx) in inputValues[inputId]" :key="idx" class="row items-center q-gutter-sm q-mb-sm">
+                  <q-input
+                    filled
+                    v-model="inputValues[inputId][idx]"
+                    :type="input.schema?.type === 'number' ? 'number' : 'text'"
+                    :label="`${input.title || inputId} ${idx + 1}`"
+                    dense
+                    style="flex: 1"
+                  />
+                  <q-btn
+                    icon="delete"
+                    round
+                    dense
+                    flat
+                    color="red"
+                    size="sm"
+                    @click="removeInputField(inputId, idx)"
+                    v-if="inputValues[inputId].length > 1"
+                  >
+                    <q-tooltip>Remove</q-tooltip>
+                  </q-btn>
+                </div>
+              </template>
+
+              <!-- Literal input (no enum) -->
+              <template v-else-if="!input.schema?.enum">
+                <q-input
+                  filled
+                  v-model="inputValues[inputId]"
+                  :type="input.schema?.type === 'number' ? 'number' : 'text'"
+                  :label="input.title || inputId"
+                  dense
+                  class="q-ml-sm"
+                  style="flex: 1"
+                />
+              </template>
+
+              <!-- Enum input -->
+              <template v-else>
+                <q-select
+                  filled
+                  v-model="inputValues[inputId]"
+                  :options="input.schema.enum"
+                  :label="input.title || inputId"
+                  dense
+                  class="q-ml-sm"
+                  style="flex: 1"
+                />
+              </template>
             </div>
           </q-card>
 
@@ -392,7 +566,14 @@ const removeInputField = (inputId: string, index: number) => {
             </div>
           </q-card>
         </div>
-
+          <q-select
+            v-model="preferMode"
+            :options="['respond-async', 'respond-sync']"
+            label="Execution Mode"
+            filled
+            dense
+            class="q-mb-md"
+          />
         <div class="q-mt-md row q-gutter-sm">
           <q-btn label="Submit" type="submit" color="primary" />
           <q-btn color="primary" outline label="Show JSON Preview" @click="showDialog = true" />
