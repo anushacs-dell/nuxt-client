@@ -170,7 +170,8 @@ const handleLogout = async () => {
 
       const body = new URLSearchParams({
           'id_token_hint': token.id_token,
-          'redirect_uri': config.public.AUTH_ORIGIN,
+          'post_logout_redirect_uri': config.public.AUTH_ORIGIN,
+          'client_id': config.public.CLIENT_ID,
         });
       console.log("logoutUrl: ", logoutUrl)
       console.log("body: ", body)

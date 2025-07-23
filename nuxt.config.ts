@@ -4,11 +4,11 @@ import {defineQuasarConfig} from './quasar.config'
 export default defineNuxtConfig({
     app: {
         head: {
-            title: 'ZooProject Nuxt Client',
+            title: 'ZOO-Project Nuxt Client',
             meta: [
                 {
                     name: 'description',
-                    content: 'ZooProject WebApp Client Made with Nuxt3 and VueJS 3.'
+                    content: 'ZOO-Project WebApp Client Made with Nuxt3 and VueJS 3.'
                 }
             ],
             link: [
@@ -16,7 +16,7 @@ export default defineNuxtConfig({
             ]
         },
     },
-    compatibilityDate: '2024-04-03',
+    compatibilityDate: '2024-12-31',
     devtools: {enabled: true},
     components: true,
     imports: {
