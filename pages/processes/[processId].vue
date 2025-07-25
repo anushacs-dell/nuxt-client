@@ -2,7 +2,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useRuntimeConfig } from '#imports'
-import { reactive } from 'vue'
+import { triggerRef } from 'vue'
 
 const {
   params: { processId }
@@ -48,9 +48,10 @@ const fetchData = async () => {
           (input?.schema?.oneOf?.some(f => f.contentMediaType))
         ) {
           const supportedFormats = input.schema.oneOf?.map(f => f.contentMediaType) || DEFAULT_SUPPORTED_FORMATS;
-
-          inputValues.value[key] = {
-            mode: 'href',
+          const hrefOptions = input?.example?.hrefOptions || []
+          inputValues.value[key] = [
+          {
+            mode: hrefOptions.length > 0 ? 'href' : 'value',
             href: '',
             value: '',
             format: supportedFormats[0],
