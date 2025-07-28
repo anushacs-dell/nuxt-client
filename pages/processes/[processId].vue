@@ -20,6 +20,9 @@ const jobStatus = ref('')
 const preferMode = ref<'respond-async' | 'respond-sync'>('respond-async')
 const jsonRequestPreview = ref('')
 const showDialog = ref(false)
+const requiredInputs = ref<string[]>([])
+const inputRefs = ref<Record<string, HTMLElement | null>>({})
+const validationErrors = ref<Record<string, boolean>>({})
 
 const subscriberValues = ref({
   successUri: 'http://zookernel/cgi-bin/publish.py?jobid=JOBSOCKET-83dcc87e-55a7-11f0-abed-0242ac106a07&type=success',
@@ -40,14 +43,22 @@ const fetchData = async () => {
       for (const [key, input] of Object.entries(data.value.inputs)) {
         console.log(input)
         console.log('isComplexInput:', input, isComplexInput(input))
-
+        if (input.minOccurs === undefined && input.maxOccurs === undefined) {
+          requiredInputs.value.push(key)
+        }
         // Complex input
         if (
           input?.schema?.contentMediaType ||
           input?.schema?.mediaType ||
           (input?.schema?.oneOf?.some(f => f.contentMediaType))
         ) {
-          const supportedFormats = input.schema.oneOf?.map(f => f.contentMediaType) || DEFAULT_SUPPORTED_FORMATS;
+          const supportedFormats = (
+            input.schema.oneOf?.map(f => f.contentMediaType).filter(Boolean) || []
+          );
+
+          if (!supportedFormats.includes('application/json')) {
+            supportedFormats.push('application/json');
+          }
           const hrefOptions = input?.example?.hrefOptions || []
           inputValues.value[key] = [
           {
@@ -56,7 +67,7 @@ const fetchData = async () => {
             value: '',
             format: supportedFormats[0],
             availableFormats: supportedFormats,
-            hrefOptions // Add this if applicable
+            hrefOptions
           }
         ]
           continue;
@@ -213,7 +224,65 @@ const pollJobStatus = async (jobId: string) => {
   }
 }
 
+const validateRequiredInputs = (): boolean => {
+  for (const inputId of requiredInputs.value) {
+    const val = inputValues.value[inputId]
+
+    if (val === undefined || val === '' || (Array.isArray(val) && val.every(v => !v.value && !v.href))) {
+      return false
+    }
+
+    // Bounding box case
+    if (val && typeof val === 'object' && 'bbox' in val) {
+      if (val.bbox.some(coord => coord === null || coord === undefined || coord === '')) {
+        return false
+      }
+    }
+  }
+
+  return true
+}
+
+function setInputRef(id: string, el: HTMLElement | null) {
+  if (el) {
+    inputRefs.value[id] = el
+  }
+}
+
+function validateAndSubmit() {
+  validationErrors.value = {}
+
+  let firstInvalid: string | null = null
+
+  for (const key of requiredInputs.value) {
+    const value = inputValues.value[key]
+    const isEmpty = Array.isArray(value) ? value.length === 0 : !value
+
+    if (isEmpty) {
+      validationErrors.value[key] = true
+      if (!firstInvalid) firstInvalid = key
+    }
+  }
+
+  if (firstInvalid) {
+    const el = inputRefs.value[firstInvalid]
+    if (el?.scrollIntoView) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+    return
+  }
+
+  submitProcess()
+}
+
 const submitProcess = async () => {
+  if (!validateRequiredInputs()) {
+    $q.notify({
+      type: 'negative',
+      message: 'Please fill all required inputs before submitting.'
+    })
+    return
+  }
   try {
     loading.value = true
     response.value = null
@@ -311,7 +380,7 @@ const removeInputField = (inputId: string, index: number) => {
 
       <!-- <h4>{{ data.id }} - {{ data.description }}</h4> -->
 
-      <q-form @submit.prevent="submitProcess">
+      <q-form @submit.prevent="validateAndSubmit">
 
         <div class="q-mb-lg">
           <div class="text-h4 text-weight-bold text-primary q-mb-sm">
@@ -321,10 +390,13 @@ const removeInputField = (inputId: string, index: number) => {
         </div>
 
         <div v-for="(input, inputId) in data.inputs" :key="inputId" class="q-mb-md">
-          <q-card class="q-pa-md">
-              <div class="row items-center q-mb-sm">
-                <div class="text-blue text-bold">{{ inputId.toUpperCase() }}</div>
+          <q-card class="q-pa-md" :ref="el => setInputRef(inputId, el)">
+            <div class="row items-center q-mb-sm">
+              <div class="text-blue text-bold">
+                {{ inputId.toUpperCase() }}
+                <span v-if="requiredInputs.includes(inputId)" class="text-red">*</span>
               </div>
+            </div>
 
             <!-- <div class="text-blue text-bold q-mb-sm">{{ inputId.toUpperCase() }}</div> -->
             <div class="q-gutter-sm">
@@ -467,13 +539,14 @@ const removeInputField = (inputId: string, index: number) => {
               <!-- Literal input (no enum) -->
               <template v-else-if="!input.schema?.enum">
                 <q-input
-                  filled
                   v-model="inputValues[inputId]"
                   :type="input.schema?.type === 'number' ? 'number' : 'text'"
                   :label="input.title || inputId"
                   dense
                   class="q-ml-sm"
                   style="flex: 1"
+                  :error="validationErrors[inputId]"
+                  :error-message="validationErrors[inputId] ? 'This field is required' : ''"
                 />
               </template>
 
