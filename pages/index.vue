@@ -18,7 +18,7 @@
         <!-- ✅ Help Dialog -->
         <HelpDialog
           v-model="helpVisible"
-          title="Jobs List Help"
+          title="Home Help"
           :help-content="helpContent"
         />
 
