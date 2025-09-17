@@ -13,10 +13,8 @@ const {
   params: { processId }
 } = useRoute()
 
-
 const authStore = useAuthStore()
 const config = useRuntimeConfig()
-
 
 const data = ref(null)
 const inputValues = ref<Record<string, Array<{ mode: 'value' | 'href', value: string, href: string }>>>({})
@@ -562,8 +560,6 @@ const isComplexInput = (input: any) => {
     )
   )
 }
-
-const DEFAULT_SUPPORTED_FORMATS = ['application/json', 'text/plain'] 
 
 
 const DEFAULT_SUPPORTED_FORMATS = ['application/json', 'text/plain'] 
