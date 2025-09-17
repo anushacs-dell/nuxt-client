@@ -3,6 +3,24 @@
     <div class="row justify-center">
       <div class="col-12 q-pa-lg" style="max-width: 1080px;">
         <p class="text-h4 q-mb-md text-weight-bold">{{ t('Jobs List') }}</p>
+
+        <!-- ✅ Help Button -->
+        <q-btn
+          flat
+          icon="help_outline"
+          color="primary"
+          :label="t('Help')"
+          @click="helpVisible = true"
+          class="q-mb-md"
+        />
+
+        <!-- ✅ Help Dialog -->
+        <HelpDialog
+          v-model="helpVisible"
+          title="Jobs List Help"
+          :help-content="helpContent"
+        />
+
         <q-separator />
 
         <q-card class="q-pa-md q-mt-md shadow-2 rounded-borders">
@@ -73,6 +91,9 @@ import { useAuthStore } from '~/stores/auth'
 import { useI18n } from 'vue-i18n'
 import { Notify } from 'quasar'
 
+// Import Help components
+import HelpDialog from '../../components/help/HelpDialog.vue'
+import jobListHelp from '../../components/help/jobListHelp.js'
 
 const config = useRuntimeConfig()
 const authStore = useAuthStore()
@@ -88,7 +109,8 @@ const loading = ref(false)
 const showModal = ref(false)
 const modalContent = ref('')
 
-
+const helpVisible = ref(false)
+const helpContent = jobListHelp
 
 const fetchData = async () => {
   loading.value = true

@@ -2,6 +2,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRuntimeConfig, useRouter } from '#imports'
 import { useI18n } from 'vue-i18n'
+import { QCard, QCardSection, QInput, QBtn, QDialog, QForm, QUploader, QSpinnerGears, Notify } from 'quasar'
+
+// ✅ Import Help components
+import HelpDialog from '../../components/help/HelpDialog.vue'
+import processListHelp from '../../components/help/processListHelp.js'
 
 const authStore = useAuthStore()
 const { locale, t } = useI18n()
@@ -14,35 +19,36 @@ const modalContent = ref('')
 const showModal = ref(false)
 const toDisplayString = ref('')
 
-import { QCard, QCardSection, QInput, QBtn, QDialog, QForm, QUploader, QSpinnerGears, Notify } from 'quasar';
+// ✅ Help dialog state
+const helpVisible = ref(false)
+const helpContent = processListHelp
 
 const viewProcess = (row: any) => {
   router.push(`/processes/${row.id}`)
 }
 
 const packageProcess = async (row: any) => {
-    try {
-      const response = await fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/processes/${row.id}/package`, {
-        method: 'GET',
-        headers: {
-          "Accept": "application/cwl+yaml",
-          'Authorization': `Bearer ${authStore.token.access_token}`,
-           'Accept-Language': locale.value
-        }
-      })
-      if (response.ok) {
-        console.log('Application Package downloaded successfully')
-        modalContent.value = await response.text()
-        showModal.value = true
-      } else {
-        console.error('Error downloading Application Package')
-        showModal.value = false
+  try {
+    const response = await fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/processes/${row.id}/package`, {
+      method: 'GET',
+      headers: {
+        "Accept": "application/cwl+yaml",
+        'Authorization': `Bearer ${authStore.token.access_token}`,
+        'Accept-Language': locale.value
       }
-    } catch (error) {
-      console.error('Application Package request failed', error)
+    })
+    if (response.ok) {
+      console.log('Application Package downloaded successfully')
+      modalContent.value = await response.text()
+      showModal.value = true
+    } else {
+      console.error('Error downloading Application Package')
       showModal.value = false
     }
-
+  } catch (error) {
+    console.error('Application Package request failed', error)
+    showModal.value = false
+  }
 }
 
 const isConformToCwl = ref(false)
@@ -55,7 +61,7 @@ const checkConformance = async () => {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-         'Accept-Language': locale.value
+        'Accept-Language': locale.value
       }
     })
 
@@ -163,7 +169,7 @@ const submitForm = async () => {
       headers: {
         'Content-Type': 'application/cwl+yaml',
         'Authorization': `Bearer ${authStore.token.access_token}`,
-         'Accept-Language': locale.value
+        'Accept-Language': locale.value
       },
       body: fileContent.value,
     })
@@ -241,7 +247,6 @@ const onClearSearch = async () => {
   filter.value = ''
   await fetchData()
 }
-
 </script>
 
 <template>
@@ -249,6 +254,24 @@ const onClearSearch = async () => {
     <div class="row justify-center">
       <div class="col-12 q-pa-md" style="max-width: 1080px;">
         <p class="text-h4 q-mb-md text-weight-bold">{{t('Processes List')}}</p>
+
+        <!-- ✅ Help Button -->
+        <q-btn
+          flat
+          icon="help_outline"
+          color="primary"
+          :label="t('Help')"
+          @click="helpVisible = true"
+          class="q-mb-md"
+        />
+
+        <!-- ✅ Help Dialog -->
+        <HelpDialog
+          v-model="helpVisible"
+          title="Processes List Help"
+          :help-content="helpContent"
+        />
+
         <q-btn
           v-if="isConformToCwl === true"
           color="primary"
@@ -279,7 +302,7 @@ const onClearSearch = async () => {
         >
           <template v-slot:body-cell-link="{ row }">
             <q-td class="text-center">
-              <q-btn-dropdown v-if="row.mutable === true" color="primary" label="Actions" flat >
+              <q-btn-dropdown v-if="row.mutable === true" color="primary" label="Actions" flat>
                 <q-list>
                   <q-item clickable v-close-popup @click="viewProcess(row)">
                     <q-item-section>{{t('View')}}</q-item-section>
@@ -292,16 +315,16 @@ const onClearSearch = async () => {
                   </q-item>
                 </q-list>
               </q-btn-dropdown>
-              <NuxtLink v-else :to="`/processes/${row.id}`" >{{ row.id }}</NuxtLink>
+              <NuxtLink v-else :to="`/processes/${row.id}`">{{ row.id }}</NuxtLink>
             </q-td>
           </template>
         </q-table>
 
         <q-separator />
-
       </div>
     </div>
 
+    <!-- Add Process Dialog -->
     <q-dialog v-model="dialog" persistent>
       <q-card style="min-width: 800px; max-width: 90vw;">
         <q-card-section>
@@ -339,6 +362,7 @@ const onClearSearch = async () => {
       </q-card>
     </q-dialog>
 
+    <!-- Package Modal -->
     <q-dialog v-model="showModal" persistent>
       <q-card style="min-width: 600px; max-width: 90vw;" class="rounded-borders">
         <q-card-section class="row items-center q-pb-none">
@@ -355,6 +379,5 @@ const onClearSearch = async () => {
         </q-card-section>
       </q-card>
     </q-dialog>
-
   </q-page>
 </template>

@@ -5,6 +5,23 @@
 
         <p class="text-h4 q-mb-md text-weight-bold">{{ t('Home') }}</p>
 
+        <!-- ✅ Help Button -->
+        <q-btn
+          flat
+          icon="help_outline"
+          color="primary"
+          :label="t('Help')"
+          @click="helpVisible = true"
+          class="q-mb-md"
+        />
+
+        <!-- ✅ Help Dialog -->
+        <HelpDialog
+          v-model="helpVisible"
+          title="Home Help"
+          :help-content="helpContent"
+        />
+
         <q-card v-if="apiInfo" class="q-pa-md q-mb-lg">
           <q-card-section>
             <div class="text-h6">{{ apiInfo.title }}</div>
@@ -101,6 +118,8 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRuntimeConfig } from '#imports'
 import { useI18n } from 'vue-i18n'
+import HelpDialog from '../components/help/HelpDialog.vue'
+import HomepageHelp from '../components/help/HomepageHelp.js'
 
 const { locale, t } = useI18n()
 
@@ -108,6 +127,8 @@ const landingLinks = ref<any[]>([])
 const apiInfo = ref<any>(null)
 const loading = ref(false)
 const config = useRuntimeConfig()
+const helpVisible = ref(false)
+const helpContent = HomepageHelp
 
 const landingUrl = `${config.public.NUXT_ZOO_BASEURL}/ogc-api/`
 const apiSpecUrl = `${config.public.NUXT_ZOO_BASEURL}/ogc-api/api`

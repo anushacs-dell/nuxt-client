@@ -48,39 +48,41 @@ export default `
   </style>
 
   <div class="help-container">
-    <div class="help-title">🚀 How to Execute a Process</div>
-    <p>This guide helps you run a process using the OGC API service efficiently.</p>
+    <div class="help-title">📋 Understanding the Process List</div>
+    <p>This page displays all available processes that you can explore and execute using the OGC API service.</p>
 
     <div class="help-section">
-      <h5>1. Browsing Processes</h5>
-      <p>Navigate through the main page and select a process from the process lists to open its form.</p>
-    </div>
-
-    <div class="help-section">
-      <h5>2. Filling Inputs</h5>
+      <h5>1. Browsing Available Processes</h5>
       <ul>
-        <li>Provide values for each input parameter.</li>
-        <li>Complex inputs support <span class="highlight">URL (href)</span> or inline data.</li>
-        <li>Bounding boxes require coordinates and EPSG codes.</li>
+        <li>Each process is shown with its <span class="highlight">title</span> and <span class="highlight">description</span>.</li>
+        <li>You can quickly scan the list to identify the process you need.</li>
       </ul>
     </div>
 
     <div class="help-section">
-      <h5>3. Preview vs Submit</h5>
+      <h5>2. Viewing Process Details</h5>
       <ul>
-        <li><span class="highlight">Show JSON Preview:</span> Review the request before execution.</li>
-        <li><span class="highlight">Submit:</span> Send the request to start the process.</li>
+        <li>Click on a process card or row to open its detailed form.</li>
+        <li>The detailed form allows you to provide inputs and run the process.</li>
       </ul>
     </div>
 
     <div class="help-section">
-      <h5>4. Outputs</h5>
-      <p>Choose the output format and transmission type (value or reference).</p>
+      <h5>3. Searching and Filtering</h5>
+      <ul>
+        <li>Use the <span class="highlight">search box</span> to find a process by name or description.</li>
+        <li>If filters are available, use them to narrow down the list of processes.</li>
+      </ul>
     </div>
 
     <div class="help-section">
-      <h5>5. Notifications</h5>
-      <p>Provide callback URLs to receive job status updates in real time.</p>
+      <h5>4. Next Steps</h5>
+      <p>Once you select a process, you'll be redirected to its execution page where you can:</p>
+      <ul>
+        <li>Fill in required inputs.</li>
+        <li>Preview and submit execution requests.</li>
+        <li>View outputs and job results.</li>
+      </ul>
     </div>
   </div>
 `
