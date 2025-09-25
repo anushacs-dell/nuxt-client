@@ -53,6 +53,7 @@ watch(selectedLang, (val) => {
   langCookie.value = val
   locale.value = val 
   console.log("Cookie + Header:", val)
+  window.location.reload()
 })
 
 
