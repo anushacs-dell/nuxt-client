@@ -394,9 +394,9 @@ const submitProcess = async () => {
 
   // subscriber URLs for async only
   const subscribers = {
-    successUri: `http://zookernel/cgi-bin/publish.py?jobid=JOBSOCKET-${channelId.value}&type=success`,
-    inProgressUri: `http://zookernel/cgi-bin/publish.py?jobid=JOBSOCKET-${channelId.value}&type=inProgress`,
-    failedUri: `http://zookernel/cgi-bin/publish.py?jobid=JOBSOCKET-${channelId.value}&type=failed`,
+    successUri: `http://zookernel/cgi-bin/publish.py?jobid=JOBSOCKET-${jobId}&type=success`,
+    inProgressUri: `http://zookernel/cgi-bin/publish.py?jobid=JOBSOCKET-${jobId}&type=inProgress`,
+    failedUri: `http://zookernel/cgi-bin/publish.py?jobid=JOBSOCKET-${jobId}&type=failed`,
   };
 
   try {
@@ -416,7 +416,7 @@ const submitProcess = async () => {
         headers: {
           Authorization: `Bearer ${authStore.token.access_token}`,
           "Content-Type": "application/json",
-          Prefer: preferMode.value,
+          Prefer: `${preferMode.value};return=representation`,
         },
         body: JSON.stringify(originalPayload),
       }
