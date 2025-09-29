@@ -412,7 +412,7 @@ const submitProcess = async () => {
         headers: {
           Authorization: `Bearer ${authStore.token.access_token}`,
           "Content-Type": "application/json",
-          Prefer: preferMode.value,
+          Prefer: preferMode.value+(preferMode.value=="respond-async"?";return=representation":""),
         },
         body: JSON.stringify(originalPayload),
       }
@@ -442,6 +442,9 @@ const submitProcess = async () => {
           const msgJobId = msg.jobid ?? msg.jobID ?? null;
           const msgId = msg.id ?? null;
 
+          if(msgJobId==null){
+            msgJobId="JOBSOCKET-" + channelId.value;
+          }
           if (msgJobId !== "JOBSOCKET-" + channelId.value && msgId !== jobId.value) {
             console.log("Ignored WS message, not for this job:", msgJobId, msgId);
             return;
@@ -470,6 +473,13 @@ const submitProcess = async () => {
           }
         } catch (e) {
           console.error(" Invalid WS message:", event.data, e);
+          if(event.data!="1"){
+            progressPercent.value = 100;
+            progressMessage.value = "Completed successfully";
+            response.value = JSON.parse(event.data);
+            loading.value = false;
+            ws?.close();
+          }
         }
       };
 
