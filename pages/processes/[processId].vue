@@ -442,9 +442,6 @@ const submitProcess = async () => {
           const msgJobId = msg.jobid ?? msg.jobID ?? null;
           const msgId = msg.id ?? null;
 
-          if(msgJobId==null){
-            msgJobId="JOBSOCKET-" + channelId.value;
-          }
           if (msgJobId !== "JOBSOCKET-" + channelId.value && msgId !== jobId.value) {
             console.log("Ignored WS message, not for this job:", msgJobId, msgId);
             return;
