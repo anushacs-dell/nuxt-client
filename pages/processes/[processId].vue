@@ -346,25 +346,12 @@ function setInputRef(id: string, el: HTMLElement | null) {
 
 function validateAndSubmit() {
   validationErrors.value = {}
+
   let firstInvalid: string | null = null
 
   for (const key of requiredInputs.value) {
     const value = inputValues.value[key]
     let isEmpty = false
-
-    if (Array.isArray(value)) {
-      if (value.every(v => typeof v === 'object'
-        ? (!v.value && !v.href)
-        : !v)) {
-        isEmpty = true
-      }
-    } else if (value && typeof value === 'object' && 'mode' in value) {
-      if (!value.value && !value.href) {
-        isEmpty = true
-      }
-    } else if (!value) {
-      isEmpty = true
-    }
 
     if (isEmpty) {
       validationErrors.value[key] = true

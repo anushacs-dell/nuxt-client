@@ -16,6 +16,8 @@ NEXTAUTH_SECRET=mysecret
 NEXTAUTH_URL=${NUXT_BASE_URL}${NUXT_BASE_URL_PREFIX}
 ZOO_OGCAPI_REQUIRES_BEARER_TOKEN=true
 
+SUBSCRIBERURL=http://zookernel/cgi-bin/publish.py
+
 # NODE_ENV=production
 # Uncomment NODE_ENV for production
 

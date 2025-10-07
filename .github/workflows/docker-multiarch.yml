@@ -37,5 +37,5 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
-            zoo-project/nuxt-client:${{ env.RELEASE_TAG }}
-            zoo-project/nuxt-client:latest
+            zooproject/nuxt-client:${{ env.RELEASE_TAG }}
+            zooproject/nuxt-client:latest
