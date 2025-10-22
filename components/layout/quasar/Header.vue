@@ -142,9 +142,11 @@ const rightTabs = computed(() =>
     .filter(link =>
       link.href &&
       !link.href.endsWith('index.html') &&
+      !link.href.endsWith('/') && 
+      !link.href.includes('index') && 
       (
         link.type === 'application/json' ||
-        link.rel === 'service-desc' // include Swagger
+        link.rel === 'service-desc'
       )
     )
     .map(link => ({
