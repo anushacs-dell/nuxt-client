@@ -7,7 +7,8 @@ import { computed } from 'vue'
 import { useLayoutStore } from '~/stores/layout'
 import { useI18n } from 'vue-i18n'
 import { useCookie } from '#app'
-
+import 'leaflet/dist/leaflet.css'
+import 'leaflet.pm/dist/leaflet.pm.css'
 
 import DefaultLayout from '~/layouts/Default.vue'
 import QuasarLayout from '~/layouts/quasar.vue'
