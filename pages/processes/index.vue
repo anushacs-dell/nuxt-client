@@ -35,7 +35,7 @@ const dialog = ref(false)
 const processName = ref('')
 const fileContent = ref('')
 const file = ref<File | null>(null)
-const showVisualizer = ref(false)
+
 
 
 //basic helpers 
@@ -71,7 +71,7 @@ const packageProcess = async (row: any) => {
 }
 
 // load cwl-svg demo bundles  
-async function loadSvgScripts() {
+const loadSvgScripts = async () => {
   if (process.server || (window as any).svgScriptsLoaded) return
   const loadScript = (src: string) =>
     new Promise<void>((resolve, reject) => {
@@ -103,9 +103,8 @@ async function loadSvgScripts() {
 }
 
 // visualization: fetch package and render 
-async function visualizeCwl(row: any) {
+const visualizeCwl = async (row: any) => {
   loadingCwl.value = true
-  showVisualizer.value = true
   await nextTick()
 
   try {
@@ -121,7 +120,8 @@ async function visualizeCwl(row: any) {
       }
     })
     const metaData = await metaRes.json()
-    selectedProcess.value = metaData  
+    selectedProcess.value = metaData
+ 
 
 
 
@@ -151,8 +151,24 @@ async function visualizeCwl(row: any) {
   }
 }
 
+const onRowClick = async (evt, row, index) => {
+  selectedProcess.value = row
+
+  //  If the process has a package do not open cwl, just open details
+  if (row.mutable === false) {
+    router.push(`/processes/${row.id}`)
+    return
+  }
+
+  // Normal process , show CWL preview automatically
+  await visualizeCwl(row)
+}
+
+
+
+
 // render into DOM 
-async function renderCwl(yamlText) {
+const renderCwl = async (yamlText: string) => {
   const container = document.getElementById('svg-container');
   if (!container) {
     console.error('svg-container not found');
@@ -199,7 +215,7 @@ async function renderCwl(yamlText) {
 
 
 // file input handling (hidden input) 
-async function handleFileInputChange(e: Event) {
+const handleFileInputChange = async (e: Event) => {
   const input = e.target as HTMLInputElement
   const fileSelected = input?.files?.[0]
   if (!fileSelected) return
@@ -436,21 +452,102 @@ const onClearSearch = async () => {
         </div>
 
 
-            <q-table :title="t('Processes List')" :rows="rows" :columns="columns" row-key="id">
+            <q-table :title="t('Processes List')" :rows="rows" :columns="columns" row-key="id" @row-click="onRowClick">
               <template v-slot:body-cell-link="{ row }">
                 <q-td class="text-center">
-                  <q-btn-dropdown v-if="row.mutable === true" color="primary" label="Actions" flat>
+                  <q-btn-dropdown v-if="row.mutable === true" color="primary" label="Actions" flat @click.stop>
                     <q-list>
                       <q-item clickable v-close-popup @click="viewProcess(row)"><q-item-section>{{ t('View') }}</q-item-section></q-item>
                       <q-item clickable v-close-popup @click="packageProcess(row)"><q-item-section>{{ t('Package') }}</q-item-section></q-item>
-                      <q-item clickable v-close-popup @click="visualizeCwl(row)"><q-item-section>{{ t('Visualize CWL') }}</q-item-section></q-item>
                       <q-item clickable v-close-popup @click="deleteProcess(row)"><q-item-section class="text-negative">{{ t('Delete') }}</q-item-section></q-item>
                     </q-list>
                   </q-btn-dropdown>
-                  <NuxtLink v-else :to="`/processes/${row.id}`">{{ row.id }}</NuxtLink>
+                  <NuxtLink v-else :to="`/processes/${row.id}`" @click.stop>{{ row.id }}</NuxtLink>
                 </q-td>
               </template>
             </q-table>
+            <!-- CWL Preview Section -->
+            <div v-if="selectedProcess" class="row q-col-gutter-lg q-mt-lg">
+              <div class="col-8">
+
+              <h5 class="text-weight-bold">CWL Preview</h5>
+
+              <div id="svg-container"
+                  style="width: 100%; height: 600px; overflow: auto; border: 1px solid #ddd;">
+                <div id="svg-content"></div>
+              </div>
+
+              
+               <div class="q-mt-md">
+                <p class="text-weight-bold">Additional Metadata</p>
+                <pre style="background:#f5f5f5; padding:6px; border-radius:4px; max-height:200px; overflow:auto;">
+                    {{ JSON.stringify(selectedProcess?.metadata, null, 2) }}
+                </pre>
+              </div>
+              </div>
+              <!-- Right metadata -->
+              <div class="col-4 q-mt-xl">
+                <q-card flat bordered>
+                  <q-card-section>
+                    <p class="text-h6 text-weight-bold">Metadata</p>
+                    <q-separator class="q-my-sm" />
+
+                    <p><b>Description:</b> {{ selectedProcess?.description || '—' }}</p>
+                    <p><b>Version:</b> {{ selectedProcess?.version || '—' }}</p>
+
+                    <p><b>Keywords:</b></p>
+                    <ul v-if="selectedProcess?.keywords?.length">
+                      <li v-for="word in selectedProcess.keywords" :key="word">{{ word }}</li>
+                    </ul>
+                    <p v-else>—</p>
+
+                    <q-separator class="q-my-sm" />
+
+                    <!-- Inputs Table -->
+                    <p class="text-weight-bold">Inputs</p>
+                    <q-table
+                      flat
+                      :rows="Object.entries(selectedProcess?.inputs || {}).map(([key, val]) => ({
+                        label: key,
+                        type: val?.schema?.type || val?.type || 'unknown',
+                        description: val?.description || '—'
+                      }))"
+                      :columns="[
+                        { name: 'label', label: 'Label', align: 'left', field: 'label' },
+                        { name: 'type', label: 'Type', align: 'left', field: 'type' },
+                        { name: 'description', label: 'Description', align: 'left', field: 'description' }
+                      ]"
+                      dense
+                      bordered
+                      no-data-label="No inputs"
+                    />
+
+                    <q-separator class="q-my-sm" />
+
+                    <!-- Outputs Table -->
+                    <p class="text-weight-bold">Outputs</p>
+                    <q-table
+                      flat
+                      :rows="Object.entries(selectedProcess?.outputs || {}).map(([key, val]) => ({
+                        label: key,
+                        type: val?.schema?.type || val?.type || 'unknown',
+                        description: val?.description || '—'
+                      }))"
+                      :columns="[
+                        { name: 'label', label: 'Label', align: 'left', field: 'label' },
+                        { name: 'type', label: 'Type', align: 'left', field: 'type' },
+                        { name: 'description', label: 'Description', align: 'left', field: 'description' }
+                      ]"
+                      dense
+                      bordered
+                      no-data-label="No outputs"
+                    />
+
+                  </q-card-section>
+                </q-card>
+              </div>
+            </div>
+
 
       </div>
     </div>
@@ -507,61 +604,11 @@ const onClearSearch = async () => {
         </q-card-section>
       </q-card>
     </q-dialog>
-    <!-- Visualization Modal -->
-    <q-dialog v-model="showVisualizer" persistent>
-      <q-card flat bordered style="min-width:990px; max-width: 90vw; min-height:700px; max-height: 90vw;">
-        <q-card-section class="row items-center justify-between">
-          <div class="text-h6">
-            {{ selectedProcess ? `${t('CWL Visualization for')} ${selectedProcess.id}` : t('CWL Visualizer') }}
-          </div>
-          <q-btn icon="close" flat round dense @click="showVisualizer = false" />
-        </q-card-section>
 
-        <q-separator />
-
-        <q-card-section>
-          <div v-show="loadingCwl" class="absolute-center">
-            <q-spinner-gears size="2em" color="primary" />
-          </div>
-
-          <div class="row q-col-gutter-md">
-            <!-- Left: visualization -->
-            <div class="col-8">
-              <div id="svg-container" class="bg-white" style="width:100%; height:600px; overflow:auto; border:1px solid #ddd;">
-                <div id="svg-content" style="width:100%; height:100%"></div>
-              </div>
-                <div id="workflow-info" style="display:none;"></div>
-                <div id="selection-details" style="display:none;"></div>
-                <pre id="debug-panel" style="display:none; white-space: pre-wrap; background:#111; color:#fff; padding:8px; border-radius:6px;"></pre>
-            </div>
-
-            <!-- Right: metadata -->
-            <div class="col-4">
-              <q-card flat bordered>
-                <q-card-section>
-                  <p class="text-subtitle1 text-weight-bold">{{ t('Metadata') }}</p>
-                  <p><b>{{ t('Description') }}:</b> {{ selectedProcess?.description ?? '—' }}</p>
-
-                  <p><b>{{ t('Inputs') }}:</b></p>
-                  <ul>
-                    <li v-for="(val, key) in selectedProcess?.inputs || {}" :key="key">
-                      {{ key }} ({{ val?.schema?.type || val?.type || 'unknown' }})
-                    </li>
-                  </ul>
-
-                  <p><b>{{ t('Outputs') }}:</b></p>
-                  <ul>
-                    <li v-for="(val, key) in selectedProcess?.outputs || {}" :key="key">
-                      {{ key }} ({{ val?.schema?.type || val?.type || 'unknown' }})
-                    </li>
-                  </ul>
-                </q-card-section>
-              </q-card>
-            </div>
-          </div>
-        </q-card-section>
-      </q-card>
-    </q-dialog>
 
   </q-page>
 </template>
+
+<style>
+
+</style>
