@@ -1,13 +1,22 @@
-NUXT_OIDC_ISSUER=https://build-keycloak-162127822228.us-central1.run.app/realms/zooproject
-NUXT_OIDC_CLIENT_ID=nuxt-zooproject
-NUXT_OIDC_CLIENT_SECRET=eyjxKvSerkxhQILAm84yOPpl3UXhEb5l
-NUXT_ZOO_BASEURL=http://localhost
-NUXT_BASE_URL=http://localhost:3000
+NUXT_OIDC_ISSUER = https://auth.geolabs.fr/realms/zooproject
+NUXT_OIDC_CLIENT_ID = webapp
+#NUXT_OIDC_CLIENT_SECRET = 50uZ6cJfSapnjp6rSFubRZjUL49Kksp0
+NUXT_OIDC_CLIENT_SECRET = bCOYEx0S73V0OmefQwWMvsy2AvpixuRm
+NUXT_ZOO_BASEURL = http://192.168.1.47
+NUXT_BASE_URL = http://192.168.1.47:3000
+
+#NODE_ENV = production
+# Uncomment NODE_ENV for production
+
+NODE_TLS_REJECT_UNAUTHORIZED=0
+
 NUXT_BASE_URL_PREFIX=
 AUTH_ORIGIN=${NUXT_BASE_URL}${NUXT_BASE_URL_PREFIX}
 NEXTAUTH_SECRET=mysecret
 NEXTAUTH_URL=${NUXT_BASE_URL}${NUXT_BASE_URL_PREFIX}
 ZOO_OGCAPI_REQUIRES_BEARER_TOKEN=true
+
+SUBSCRIBERURL=http://zookernel/cgi-bin/publish.py
 
 # NODE_ENV=production
 # Uncomment NODE_ENV for production

@@ -1,62 +1,46 @@
 <template>
-  <q-header bordered>
-    <q-toolbar class="bg-white text-grey-10 justify-between">
-      <div class="col-auto">
-        <div class="row">
+  <q-header elevated class="bg-primary text-white" height-hint="98">
+    <q-toolbar class="justify-between">
+      
+      <div class="row items-center">
+        <NuxtLink to="/">
+          <q-avatar square>
+            <q-img src="https://zoo-project.org/images/zoo-sun-logo-big.png" width="128"/>
+          </q-avatar>
+        </NuxtLink>
+        <span class="q-pl-sm text-h6">
+          <NuxtLink to="/" class="text-white" style="text-decoration:none;">
+            {{ appTitle }}
+          </NuxtLink>
+        </span>
+      </div>
 
-          <div class="col-auto">
-            <NuxtLink to="/">
-              <q-avatar square >
-                <q-img src="https://zoo-project.org/images/zoo-sun-logo-big.png" width="128"/>
-              </q-avatar>
+      
+      <div class="row items-center">
+        <SettingsMenu />
 
-            </NuxtLink>
-          </div>
-          <div class="col-auto q-pl-xs q-pt-xs" v-show="!isSmallScreen">
-            <span class="q-pl-xs text-h6 ">
-              <NuxtLink to="/" class="text-grey-10" style="text-decoration: none;">
-                Zoo-Project
-              </NuxtLink>
-            </span>
-          </div>
+        <div v-if="!authStore.user">
+          <q-btn class="q-ml-sm" dense no-caps color="accent"
+                 :label="t('Authenticate')" href="/api/auth/signin"/>
         </div>
-      </div>
-      <div :class="['q-px-sm', isSmallScreen ? '' : 'col-5'] ">
-
-      </div>
-      <div class="col-auto">
-         <div class="row items-center"> 
-          <SettingsMenu />
-
-          <div class="q-pt-sm" style="padding-top: 36px;">
-            <LayoutSharedHeaderMenu :show="showHeaderMenu" @hide="showHeaderMenu = false"/>
-          </div>
-          <div v-if="!authStore.user">
-            <q-btn v-if="isSmallScreen" class="q-px-sm" dense no-caps color="accent" round
-                   icon="mdi-account-circle" href="/api/auth/signin"/>
-            <q-btn v-else-if="!isLoggedUser" class="q-px-md" no-caps color="accent" :label="t('Authenticate')"
-                   :href="'/api/auth/signin'"/>
-          </div>
-          <div v-else>
-            <q-btn rounded dense flat>
-              <q-avatar>
-                <img :src="gravatarUrl">
-              </q-avatar>
-            </q-btn>
-            <q-menu>
-              <q-list dense>
-                <q-item clickable v-close-popup 
-                  :href="`${config.public.NUXT_OIDC_ISSUER}/account/?referrer=${config.public.NUXT_OIDC_CLIENT_ID}&referrer_uri=${config.public.AUTH_ORIGIN}`"
-                  class="q-px-lg">
-                  <q-item-section class="q-px-sm">{{ t('Profile') }}</q-item-section>
-                </q-item>
-                <q-separator/>
-                <q-item clickable v-close-popup @click="showLogoutDialog">
-                  <q-item-section class="q-px-sm">{{ t('logout') }}</q-item-section>
-                </q-item>
-              </q-list>
-            </q-menu>
-          </div>
+        <div v-else>
+          <q-btn rounded dense flat>
+            <q-avatar>
+              <img :src="gravatarUrl">
+            </q-avatar>
+          </q-btn>
+          <q-menu>
+            <q-list dense>
+              <q-item clickable v-close-popup 
+                :href="`${config.public.NUXT_OIDC_ISSUER}/account/?referrer=${config.public.NUXT_OIDC_CLIENT_ID}&referrer_uri=${config.public.AUTH_ORIGIN}`">
+                <q-item-section>{{ t('Profile') }}</q-item-section>
+              </q-item>
+              <q-separator/>
+              <q-item clickable v-close-popup @click="showLogoutDialog">
+                <q-item-section>{{ t('logout') }}</q-item-section>
+              </q-item>
+            </q-list>
+          </q-menu>
         </div>
       </div>
     </q-toolbar>
@@ -86,7 +70,6 @@
   </div>
 </div>
 
-
   </q-header>
 </template>
 
@@ -98,30 +81,25 @@ import { useCookie } from '#app'
 import { useAuthStore } from '~/stores/auth'
 import { useLandingLinks } from '~/composables/utils/useLandingLinks'
 
+import { useCustomAppConfig } from '~/composables/utils/useCustomAppConfig'
+
+const { locale, t } = useI18n()
+
+const authStore = useAuthStore()
+const { appTitle } = useCustomAppConfig()
 const config = useRuntimeConfig()
+
 const showHeaderMenu = ref(false)
 const isLoggedUser = ref(false) // TODO: Implement user authentication and pinia storage of user data
 const loggedUser = ref({email: 'mathereall@gmail.com'}) // TODO: Implement user authentication and pinia storage of user data
 
 
-const authStore = useAuthStore()
-const { landingLinks } = useLandingLinks()
-
-
-
-
-const { locale, t } = useI18n()
-
-
 const $q = useQuasar()
 const stringToMD5 = useStringToMD5()
-
-const isProcessing = ref(false)
 const router = useRouter()
 const {signOut} = useAuth()
 
-const gravatarUrl = ref('https://www.gravatar.com/avatar/46d229b033af06a191ff2267bca9ae56/')
-
+const { landingLinks } = useLandingLinks()
 
 
 
@@ -141,7 +119,7 @@ function rewriteHref(href: string): string {
   return `/${relative}` 
 }
 
-// helper to generate labels
+// to generate labels
 function autoLabel(href: string, rel?: string): string {
   if (rel === 'service-desc') return 'Swagger'
   const filename = href.split('/').pop()?.replace('.html', '') || ''
@@ -178,9 +156,13 @@ const rightTabs = computed(() =>
 )
 
 
+const gravatarUrl = ref('https://www.gravatar.com/avatar/46d229b033af06a191ff2267bca9ae56/')
+
 const isSmallScreen = computed(() => {
   return $q.screen.width <= $q.screen.sizes.sm
 })
+
+const isProcessing = ref(false)
 
 const showLogoutDialog = () => {
   $q.dialog({
@@ -247,6 +229,3 @@ onMounted(() => {
 })
 
 </script>
-
-<style scoped>
-</style>

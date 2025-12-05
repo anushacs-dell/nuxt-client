@@ -4,11 +4,11 @@ import {defineQuasarConfig} from './quasar.config'
 export default defineNuxtConfig({
     app: {
         head: {
-            title: 'ZooProject Nuxt Client',
+            title: 'ZOO-Project Nuxt Client',
             meta: [
                 {
                     name: 'description',
-                    content: 'ZooProject WebApp Client Made with Nuxt3 and VueJS 3.'
+                    content: 'ZOO-Project WebApp Client Made with Nuxt3 and VueJS 3.'
                 }
             ],
             link: [
@@ -16,7 +16,7 @@ export default defineNuxtConfig({
             ]
         },
     },
-    compatibilityDate: '2024-04-03',
+    compatibilityDate: '2024-12-31',
     devtools: {enabled: true},
     components: true,
     imports: {
@@ -31,7 +31,24 @@ export default defineNuxtConfig({
     vue: {
         compilerOptions: {}
     },
-    modules: ["@pinia/nuxt", "nuxt-quasar-ui", "@sidebase/nuxt-auth"],
+    modules: ["@pinia/nuxt", "nuxt-quasar-ui", "@sidebase/nuxt-auth","@nuxtjs/i18n"],
+
+    i18n: {
+        langDir: 'locales',
+        locales: [
+          { code: 'en-US', iso: 'en-US', file: 'en.json', name: 'English' },
+          { code: 'fr-FR', iso: 'fr-FR', file: 'fr.json', name: 'Française' }
+        ],
+        defaultLocale: 'en-US',
+        lazy: true,
+        strategy: 'no_prefix',
+        detectBrowserLanguage: {
+          useCookie: true,
+          cookieKey: 'i18n_redirected',
+          fallbackLocale: 'en-US',
+        }
+      },
+       
 
     auth: {
         isEnabled: true,
@@ -57,7 +74,8 @@ export default defineNuxtConfig({
             NUXT_OIDC_CLIENT_ID: process.env.NUXT_OIDC_CLIENT_ID,
             AUTH_ORIGIN: process.env.AUTH_ORIGIN,
             NEXTAUTH_URL: process.env.NEXTAUTH_URL,
-            ZOO_OGCAPI_REQUIRES_BEARER_TOKEN: process.env.ZOO_OGCAPI_REQUIRES_BEARER_TOKEN
+            ZOO_OGCAPI_REQUIRES_BEARER_TOKEN: process.env.ZOO_OGCAPI_REQUIRES_BEARER_TOKEN,
+            SUBSCRIBERURL: process.env.SUBSCRIBERURL,
         },
     }
 })
