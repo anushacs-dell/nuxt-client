@@ -12,6 +12,7 @@
     },
     "dependencies": {
         "@auth/core": "^0.34.2",
+        "@geoman-io/leaflet-geoman-free": "^2.18.3",
         "@mdi/js": "^7.4.47",
         "@nuxt/ui": "^2.18.4",
         "@nuxtjs/i18n": "^9.5.6",
@@ -24,6 +25,8 @@
         "cwlts": "^1.23.10",
         "html2canvas": "^1.4.1",
         "js-yaml": "^4.1.1",
+        "leaflet": "^1.9.4",
+        "leaflet.pm": "^2.2.0",
         "nanoid": ">=5.0.9",
         "next-auth": "^4.21.1",
         "nuxt": "^3.15.4",
