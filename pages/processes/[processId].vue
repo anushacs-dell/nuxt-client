@@ -1,21 +1,22 @@
 <script setup lang="ts">
-import { useHead, useRuntimeConfig } from '#imports'
-import { ref, onMounted, watch, reactive } from 'vue'
+import { useHead } from '#imports'
+import { ref, onMounted, watch, reactive, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
+import { useRuntimeConfig } from '#imports'
 import { triggerRef } from 'vue'
-import { uuid } from 'vue-uuid'
+import { uuid } from 'vue-uuid';
 import { useQuasar } from 'quasar'
 import HelpDialog from '@/components/help/HelpDialog.vue'
 import processIdHelp from '@/components/help/processIdHelp.js'
-
-
+ 
+ 
 const {
   params: { processId }
 } = useRoute()
-
+ 
 const authStore = useAuthStore()
 const config = useRuntimeConfig()
-
+ 
 const data = ref(null)
 const inputValues = ref<Record<string, Array<{ mode: 'value' | 'href', value: string, href: string }>>>({})
 const outputValues = ref<Record<string, any>>({})
@@ -42,8 +43,8 @@ const editingBboxKey = ref<string | null>(null)
 let map: L.Map | null = null
 let drawLayer: L.LayerGroup | null = null
 let drawnFeature: L.Layer | null = null
-
-
+ 
+ 
 // Helper to extract a default bbox from various schema styles (old & new)
 const getDefaultBbox = (schema: any) => {
   //  Try the new schema style: ogc-bbox with allOf references
@@ -51,28 +52,28 @@ const getDefaultBbox = (schema: any) => {
     const bbox = schema?.example?.bbox || schema?.schema?.example?.bbox
     if (Array.isArray(bbox)) return bbox.slice(0, 4)
   }
-
+ 
   //  Try the old schema style: bbox.yaml references or bbox property
   if (schema?.example?.bbox && Array.isArray(schema.example.bbox)) {
     return schema.example.bbox.slice(0, 4)
   }
-
+ 
   if (schema?.properties?.bbox?.default && Array.isArray(schema.properties.bbox.default)) {
     return schema.properties.bbox.default.slice(0, 4)
   }
-
+ 
   // fallback
   return [0, 0, 0, 0]
 }
-
-
+ 
+ 
 const subscriberValues = ref({
   successUri: `${config.public.SUBSCRIBERURL}?jobid=JOBSOCKET-${channelId.value}&type=success`,
   inProgressUri: `${config.public.SUBSCRIBERURL}?jobid=JOBSOCKET-${channelId.value}&type=inProgress`,
   failedUri: `${config.public.SUBSCRIBERURL}jobid=JOBSOCKET-${channelId.value}&type=failed`
 })
-
-
+ 
+ 
 // Detects whether a schema describes complex content (has contentMediaType / mediaType / oneOf with contentMediaType)
 const hasContentMedia = (schema: any) =>
   !!(
@@ -80,27 +81,27 @@ const hasContentMedia = (schema: any) =>
     schema?.mediaType ||
     (Array.isArray(schema?.oneOf) && schema.oneOf.some((f: any) => !!f?.contentMediaType))
   )
-
+ 
 // Collect supported formats (oneOf contentMediaType or contentMediaType field). Ensure application/json is present.
 const getSupportedFormats = (schema: any): string[] => {
   const list: string[] = []
-
+ 
   if (Array.isArray(schema?.oneOf)) {
     for (const f of schema.oneOf) {
       if (f?.contentMediaType) list.push(f.contentMediaType)
       else if (f?.type === 'object') list.push('application/json')
     }
   }
-
+ 
   if (schema?.contentMediaType) list.push(schema.contentMediaType)
   if (schema?.mediaType) list.push(schema.mediaType)
-
+ 
   if (!list.includes('application/json')) list.push('application/json')
   // unique
   return Array.from(new Set(list))
 }
-
-
+ 
+ 
 // Provide a readable label for the q-badge (so complex shows the media type OR href/value mode)
 const typeLabel = (input: any, valForInputId: any) => {
   if (hasContentMedia(input.schema)) {
@@ -125,8 +126,7 @@ const typeLabel = (input: any, valForInputId: any) => {
   }
   return input?.schema?.type || 'literal'
 }
-
-
+ 
 const fetchData = async () => {
   try {
     data.value = await $fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/processes/${processId}`, {
@@ -134,20 +134,18 @@ const fetchData = async () => {
         Authorization: `Bearer ${authStore.token.access_token}`
       }
     })
-
-
-
+ 
     if (data.value && data.value.inputs) {
       for (const [key, input] of Object.entries(data.value.inputs)) {
         if (input.minOccurs !== 0) {
           requiredInputs.value.push(key)
         }
-
+ 
         // COMPLEX input (single or oneOf/contentMediaType)
         if (hasContentMedia(input.schema)) {
           const supportedFormats = getSupportedFormats(input.schema)
           const hrefOptions = input?.example?.hrefOptions || []
-
+ 
           if (input.maxOccurs && input.maxOccurs > 1) {
             // multiple allowed → array
             inputValues.value[key] = [
@@ -173,7 +171,7 @@ const fetchData = async () => {
           }
           continue
         }
-
+ 
         // COMPLEX ARRAY input
         if (input.schema?.type === 'array' && hasContentMedia(input.schema.items)) {
           const supportedFormats = getSupportedFormats(input.schema.items)
@@ -188,11 +186,11 @@ const fetchData = async () => {
           ]
           continue
         }
-
+ 
         // Bounding Box input — support old schema + new allOf/ogc-bbox/bbox.yaml variants
         const detectBboxFromSchema = (schema: any) => {
           if (!schema) return null;
-
+ 
           // --- Old-style bbox detection ---
           if (schema.type === 'object' && schema.properties) {
             const props = schema.properties || {};
@@ -206,7 +204,7 @@ const fetchData = async () => {
               }
             }
           }
-
+ 
           // --- New-style allOf detection ---
           if (Array.isArray(schema.allOf)) {
             for (const s of schema.allOf) {
@@ -223,10 +221,10 @@ const fetchData = async () => {
               if (nested) return nested;
             }
           }
-
+ 
           return null;
         };
-
+ 
         const bboxInfo = detectBboxFromSchema(input.schema);
         if (bboxInfo) {
           const defaultBbox = getDefaultBbox(input);
@@ -237,18 +235,18 @@ const fetchData = async () => {
           });
           continue;
         }
-
+ 
         // Multiple literal inputs (array but not complex)
         if (input.schema?.type === 'array') {
           inputValues.value[key] = ['']
           continue
         }
-
+ 
         // Default init for literal input
         inputValues.value[key] = input.schema?.default ?? (input.schema?.type === 'number' ? 0 : '')
       }
     }
-
+ 
     // Outputs initialization
     if (data.value && data.value.outputs) {
       for (const [key, input] of Object.entries(data.value.outputs)) {
@@ -275,21 +273,8 @@ const fetchData = async () => {
     console.error('Error fetching data:', error)
   }
 }
-
+ 
 let L: any = null
-
-
-onMounted(async () => {
-  if (process.client) {
-    // ✅ Import only on the client
-    const leaflet = await import('leaflet')
-    await import('@geoman-io/leaflet-geoman-free')
-    await import('@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css')
-    L = leaflet.default
-    await fetchData()
-  }
-})
-
 
 watch(
   () => data.value,
@@ -375,20 +360,37 @@ watch(
   { immediate: true }
 )
 
+const iconMap: Record<string, string> = {
+  softwareVersion: "apps",
+  author: "person",
+  codeRepository: "cloud_upload",
+  license: "description",
+};
 
-
-onMounted(() => {
-  fetchData()
+// Convert URL - softwareVersion
+const extractMetaType = (role: string) => {
+  if (!role) return '';
+  return role.split("/").pop(); 
+};
+ 
+onMounted(async () => {
+  if (process.client) {
+    // ✅ Import only on the client
+    const leaflet = await import('leaflet')
+    await import('@geoman-io/leaflet-geoman-free')
+    await import('@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css')
+    L = leaflet.default
+    await fetchData()
+  }
 })
-
-
+ 
 const convertOutputsToPayload = (outputs: Record<string, any[]>) => {
   const result: Record<string, any> = {}
-  
+ 
   for (const [key, outputArray] of Object.entries(outputs)) {
     if (outputArray && outputArray.length > 0) {
       const outputConfig: any = {}
-      
+     
       // Parcourir chaque élément du tableau
       outputArray.forEach(item => {
         if (item.id === 'transmission') {
@@ -399,20 +401,20 @@ const convertOutputsToPayload = (outputs: Record<string, any[]>) => {
           }
         }
       })
-      
+     
       result[key] = outputConfig
     }
   }
   return result
 }
-
+ 
 watch(
   [inputValues, outputValues, subscriberValues],
   ([newInputs, newOutputs, newSubscribers]) => {
     console.log('Outputs changed:', newOutputs)
-
+ 
     const formattedInputs: Record<string, any> = {}
-
+ 
     for (const [key, val] of Object.entries(newInputs)) {
       if (
         val === undefined ||
@@ -422,7 +424,7 @@ watch(
       ) {
         continue
       }
-
+ 
       // ✅ ADD THIS: handle Bounding Box inputs first
       if (val && typeof val === 'object' && 'bbox' in val) {
         formattedInputs[key] = {
@@ -431,7 +433,7 @@ watch(
         }
         continue
       }
-
+ 
       // If multiple inputs (array)
       if (Array.isArray(val)) {
         if (val.every(v => typeof v === 'string' || typeof v === 'number')) {
@@ -458,7 +460,7 @@ watch(
         formattedInputs[key] = val
       }
     }
-
+ 
     const payload = {
       inputs: formattedInputs,
       outputs: convertOutputsToPayload(newOutputs),
@@ -468,23 +470,23 @@ watch(
         failedUri: newSubscribers.failedUri
       }
     }
-
+ 
     jsonRequestPreview.value = JSON.stringify(payload, null, 2)
   },
   { deep: true }
 )
-
+ 
 const pollJobStatus = async (jobId: string) => {
   const jobUrl = `${config.public.NUXT_ZOO_BASEURL}/ogc-api/jobs/${jobId}`
   const headers = {
     Authorization: `Bearer ${authStore.token.access_token}`
   }
-
+ 
   while (true) {
     try {
       const job = await $fetch(jobUrl, { headers })
       jobStatus.value = job.status
-
+ 
       if (job.status === 'successful') {
         response.value = job
         loading.value = false
@@ -494,7 +496,7 @@ const pollJobStatus = async (jobId: string) => {
         loading.value = false
         break
       }
-
+ 
       await new Promise(resolve => setTimeout(resolve, 2000))
     } catch (err) {
       console.error('Polling error:', err)
@@ -503,18 +505,18 @@ const pollJobStatus = async (jobId: string) => {
     }
   }
 }
-
-
-
-
+ 
+ 
+ 
+ 
 const validateRequiredInputs = (): boolean => {
   for (const inputId of requiredInputs.value) {
     const val = inputValues.value[inputId]
-
+ 
     if (val === undefined || val === '' || (Array.isArray(val) && val.every(v => !v.value && !v.href))) {
       return false
     }
-
+ 
     // Bounding box case
     if (val && typeof val === 'object' && 'bbox' in val) {
       if (val.bbox.some(coord => coord === null || coord === undefined || coord === '')) {
@@ -522,54 +524,54 @@ const validateRequiredInputs = (): boolean => {
       }
     }
   }
-
+ 
   return true
 }
-
+ 
 function setInputRef(id: string, el: HTMLElement | null) {
   if (el) {
     inputRefs.value[id] = el
   }
 }
-
+ 
 function validateAndSubmit() {
   validationErrors.value = {}
-
+ 
   let firstInvalid: string | null = null
-
+ 
   for (const key of requiredInputs.value) {
     const value = inputValues.value[key]
     let isEmpty = false
-
+ 
     if (isEmpty) {
       validationErrors.value[key] = true
       if (!firstInvalid) firstInvalid = key
     }
   }
-
+ 
   if (firstInvalid) {
     // show notification here
     $q.notify({
       type: "negative",
       message: "Please fill all required inputs before submitting."
     })
-
+ 
     const el = inputRefs.value[firstInvalid]
     if (el?.scrollIntoView) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
     return
   }
-
+ 
   submitProcess()
 }
-
-
+ 
+ 
 const submitProcess = async () => {
   if (loading.value || submitting.value) {
-    return; 
+    return;
   }
-
+ 
   if (!validateRequiredInputs()) {
     $q.notify({
       type: "negative",
@@ -577,25 +579,25 @@ const submitProcess = async () => {
     });
     return;
   }
-
-
+ 
+ 
   response.value = null;
   jobStatus.value = "submitted";
   progressPercent.value = 0;
   progressMessage.value = "Submitting job...";
-
+ 
     let wsUrl = "";
     if (typeof window !== "undefined") {
       wsUrl = `ws://${window.location.hostname}:8888/`;
-    } 
-
+    }
+ 
   // subscriber URLs for async only
   const subscribers = {
     successUri: `http://zookernel/cgi-bin/publish.py?jobid=JOBSOCKET-${channelId.value}&type=success`,
     inProgressUri: `http://zookernel/cgi-bin/publish.py?jobid=JOBSOCKET-${channelId.value}&type=inProgress`,
     failedUri: `http://zookernel/cgi-bin/publish.py?jobid=JOBSOCKET-${channelId.value}&type=failed`,
   };
-
+ 
   try {
     const originalPayload = JSON.parse(jsonRequestPreview.value || "{}");
     if (preferMode.value === "respond-async") {
@@ -605,7 +607,7 @@ const submitProcess = async () => {
     }else{
       submitting.value = true;
     }
-
+ 
     const res = await $fetch(
       `${config.public.NUXT_ZOO_BASEURL}/ogc-api/processes/${processId}/execution`,
       {
@@ -618,31 +620,31 @@ const submitProcess = async () => {
         body: JSON.stringify(originalPayload),
       }
     );
-
+ 
    
     if (preferMode.value === "respond-async") {
       //  Async execution (requires jobID + websocket updates)
       if (!res || !res.jobID) {
         throw new Error("Expected async response with jobID, but got none");
       }
-
+ 
       jobId.value = res.jobID;
       console.log(" Job submitted (server jobID):", res.jobID);
-
+ 
       ws = new WebSocket(wsUrl);
       ws.onopen = () => {
         console.log(" WebSocket connected — subscribing to", "JOBSOCKET-" + channelId.value);
         ws.send("SUB JOBSOCKET-" + channelId.value);
       };
-
+ 
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
           console.log(" WS message:", msg);
-
+ 
           const msgJobId = msg.jobid ?? msg.jobID ?? null;
           const msgId = msg.id ?? null;
-
+ 
           if (msgJobId !== "JOBSOCKET-" + channelId.value && msgId !== jobId.value) {
             if(event.data!="1"){
               progressPercent.value = 100;
@@ -654,12 +656,12 @@ const submitProcess = async () => {
               console.log("Ignored WS message, not for this job:", msgJobId, msgId);
             return;
           }
-
+ 
           // handle progress
           if (msg.progress !== undefined) progressPercent.value = msg.progress;
           if (msg.message) progressMessage.value = msg.message;
-
-
+ 
+ 
           if (msg.status === "succeeded" || msg.type === "success") {
             progressPercent.value = 100;
             progressMessage.value = "Completed successfully";
@@ -680,16 +682,16 @@ const submitProcess = async () => {
           console.error(" Invalid WS message:", event.data, e);
         }
       };
-
+ 
       ws.onerror = (err) => {
         console.error("WebSocket error", err);
         progressMessage.value = "WebSocket error";
       };
-
+ 
     } else {
       //  Sync execution (result returned immediately)
       console.log(" Sync execution result:", res);
-
+ 
       //  Check if error response
       if (res.error) {
         console.error(" Sync execution error:", res.error);
@@ -703,8 +705,8 @@ const submitProcess = async () => {
         jobStatus.value = "successful";
         response.value = res;
       }
-
-
+ 
+ 
     }
   } catch (error) {
     console.error("Execution error (POST):", error);
@@ -716,18 +718,18 @@ const submitProcess = async () => {
     submitting.value = false;
   }
 };
-
-
-
-
+ 
+ 
+ 
+ 
 const isMultipleInput = (input: any) => {
   return input.maxOccurs && input.maxOccurs > 1
 }
-
+ 
 const isBoundingBoxInput = (input: any): boolean => {
   if (!input?.schema) return false;
   const schema = input.schema;
-
+ 
   // Old-style
   if (schema.type === 'object' && schema.properties) {
     for (const [key, prop] of Object.entries(schema.properties)) {
@@ -739,7 +741,7 @@ const isBoundingBoxInput = (input: any): boolean => {
       }
     }
   }
-
+ 
   // New-style (allOf with ogc-bbox or bbox.yaml)
   if (Array.isArray(schema.allOf)) {
     return schema.allOf.some(s =>
@@ -748,10 +750,10 @@ const isBoundingBoxInput = (input: any): boolean => {
       (s?.type === 'object' && isBoundingBoxInput({ schema: s }))
     );
   }
-
+ 
   return false;
 };
-
+ 
 const isComplexInput = (input: any) => {
   return (
     input?.schema &&
@@ -762,17 +764,17 @@ const isComplexInput = (input: any) => {
     )
   )
 }
-
-const DEFAULT_SUPPORTED_FORMATS = ['application/json', 'text/plain'] 
-
+ 
+const DEFAULT_SUPPORTED_FORMATS = ['application/json', 'text/plain']
+ 
 const addInputField = (inputId: string) => {
-
+ 
   if (!Array.isArray(inputValues.value[inputId])) {
     inputValues.value[inputId] = []
   }
-
+ 
   const currentFormats = inputValues.value[inputId][0]?.availableFormats || DEFAULT_SUPPORTED_FORMATS
-
+ 
   inputValues.value[inputId].push({
     mode: 'value',
     value: '',
@@ -780,41 +782,41 @@ const addInputField = (inputId: string) => {
     format: currentFormats[0],
     availableFormats: currentFormats
   })
-
+ 
   triggerRef(inputValues)
 }
-
+ 
 const removeInputField = (inputId: string, index: number) => {
   if (Array.isArray(inputValues.value[inputId]) && inputValues.value[inputId].length > 1) {
     inputValues.value[inputId].splice(index, 1)
     triggerRef(inputValues)
   }
 }
-
+ 
 //  Open map popup for editing bounding box
 const openBboxPopup = (inputKey: string) => {
   editingBboxKey.value = inputKey
   bboxDialogVisible.value = true
   nextTick(() => initMap())
 }
-
+ 
 const initMap = () => {
   if (!process.client || !L) return
   const mapContainer = document.getElementById('bbox-map')
   if (!mapContainer) return
-
+ 
   if (map) {
     map.off()
     map.remove()
     map = null
   }
-
+ 
   //  Initialize map
   map = L.map('bbox-map').setView([25.2, 55.3], 4) // default center (adjust as needed)
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map)
-
+ 
   //  Add Geoman controls
   map.pm.addControls({
     position: 'topleft',
@@ -830,10 +832,10 @@ const initMap = () => {
     cutPolygon: false,
     removalMode: true
   })
-
+ 
   // Layer to hold drawings
   drawLayer = L.layerGroup().addTo(map)
-
+ 
   // draw current bbox for editing (convert to 4326 for Leaflet if needed)
   const current = editingBboxKey.value ? inputValues.value[editingBboxKey.value] : null
     if (current && Array.isArray(current.bbox) && current.bbox.length === 4) {
@@ -865,18 +867,18 @@ const initMap = () => {
       try { drawLayer.removeLayer(drawnFeature) } catch (err) {}
       drawnFeature = null
     }
-
+ 
     drawnFeature = e.layer
     drawLayer.addLayer(drawnFeature)
-
+ 
     // Ensure the new layer is editable right away
     if (drawnFeature.pm && typeof drawnFeature.pm.enable === 'function') {
       drawnFeature.pm.enable({ allowSelfIntersection: false })
     }
-
+ 
     // update the bbox value from the new layer
     updateBboxFromLayer()
-
+ 
     // attach edit/remove handlers to keep inputValues in sync
     drawnFeature.on('pm:edit', () => updateBboxFromLayer())
     drawnFeature.on('pm:remove', () => {
@@ -886,44 +888,87 @@ const initMap = () => {
       drawnFeature = null
     })
   })
-
+ 
 }
+ 
 
-const updateBboxFromLayer = () => {
-  if (!drawnFeature || !editingBboxKey.value) return
+// Replace existing updateBboxFromLayer() with this code
+const updateBboxFromLayer = async () => {
+  if (!drawnFeature || !editingBboxKey.value) return;
 
-  const bounds = drawnFeature.getBounds()
-  const bbox = [
+  const bounds = drawnFeature.getBounds();
+  // Leaflet provides lon/lat in these values (we treat as EPSG:4326)
+  const bbox4326 = [
     Number(bounds.getWest().toFixed(6)),  // minx (lon)
     Number(bounds.getSouth().toFixed(6)), // miny (lat)
     Number(bounds.getEast().toFixed(6)),  // maxx (lon)
     Number(bounds.getNorth().toFixed(6))  // maxy (lat)
-  ]
+  ];
 
-  // Save bbox to inputValues (ensure array exists)
-  if (!inputValues.value[editingBboxKey.value]) {
-    inputValues.value[editingBboxKey.value] = { bbox: bbox, crs: 'EPSG:4326', _schemaPropName: 'bbox' }
+  // Get the desired / user-selected CRS for this input (normalize to EPSG:####)
+  let desiredCrs = (inputValues.value[editingBboxKey.value]?.crs || 'EPSG:4326').toString();
+  if (/^\d+$/.test(desiredCrs)) desiredCrs = `EPSG:${desiredCrs}`;
+  if (!/^EPSG:/i.test(desiredCrs)) desiredCrs = `EPSG:${desiredCrs}`;
+
+  // If desired is not 4326 we must convert the drawn (4326) bbox to desiredCrs
+  if (desiredCrs !== 'EPSG:4326') {
+    try {
+      await ensureProj4(); // loader already present in your file
+      // Ensure proj defs are known (reuse logic from reprojectBbox if needed)
+      // Convert SW and NE corner from 4326 -> desiredCrs
+      const sw = proj4('EPSG:4326', desiredCrs, [bbox4326[0], bbox4326[1]]);
+      const ne = proj4('EPSG:4326', desiredCrs, [bbox4326[2], bbox4326[3]]);
+
+      // Build min/max in target CRS (in case coords swapped)
+      const converted = [
+        Math.min(sw[0], ne[0]),
+        Math.min(sw[1], ne[1]),
+        Math.max(sw[0], ne[0]),
+        Math.max(sw[1], ne[1])
+      ].map(Number);
+
+      // Save in inputValues using the user-selected CRS
+      if (!inputValues.value[editingBboxKey.value]) {
+        inputValues.value[editingBboxKey.value] = { bbox: converted, crs: desiredCrs, _schemaPropName: 'bbox' };
+      } else {
+        inputValues.value[editingBboxKey.value].bbox = converted;
+        inputValues.value[editingBboxKey.value].crs = desiredCrs;
+      }
+    } catch (e) {
+      console.error('Could not reproject drawn bbox to desired CRS', desiredCrs, e);
+      // fallback: store as EPSG:4326 (old behaviour) but notify user
+      inputValues.value[editingBboxKey.value].bbox = bbox4326;
+      inputValues.value[editingBboxKey.value].crs = 'EPSG:4326';
+      $q.notify({ type: 'warning', message: `Could not convert bbox to ${desiredCrs}. Saved as EPSG:4326.` });
+    }
   } else {
-    inputValues.value[editingBboxKey.value].bbox = bbox
-    inputValues.value[editingBboxKey.value].crs = 'EPSG:4326'
+    // desired is EPSG:4326 — no reprojection needed
+    if (!inputValues.value[editingBboxKey.value]) {
+      inputValues.value[editingBboxKey.value] = { bbox: bbox4326, crs: 'EPSG:4326', _schemaPropName: 'bbox' };
+    } else {
+      inputValues.value[editingBboxKey.value].bbox = bbox4326;
+      inputValues.value[editingBboxKey.value].crs = 'EPSG:4326';
+    }
   }
-}
-
+};
+ 
+ 
+ 
 const closeBboxPopup = () => {
   bboxDialogVisible.value = false
   editingBboxKey.value = null
 }
-
+ 
 const confirmBboxSelection = () => {
   if (editingBboxKey.value && inputValues.value[editingBboxKey.value]?.bbox) {
     console.log('Confirmed bbox:', inputValues.value[editingBboxKey.value].bbox)
   }
   closeBboxPopup()
 }
-
+ 
 // ----- reprojection helpers -----
 let proj4: any = null
-
+ 
 // ensure proj4 loaded on client
 const ensureProj4 = async () => {
   if (proj4) return proj4
@@ -932,7 +977,7 @@ const ensureProj4 = async () => {
   proj4 = mod.default ?? mod
   return proj4
 }
-
+ 
 /**
  * Fetch a proj4 definition (text like "+proj=...") for a given EPSG code
  * using epsg.io proj4 endpoint as fallback. Returns a proj4 definition string or null.
@@ -943,7 +988,7 @@ const fetchProjDef = async (epsgCode: string): Promise<string | null> => {
   let code = (epsgCode || '').toString()
   if (/^\d+$/.test(code)) code = `EPSG:${code}`
   if (!/^EPSG:/i.test(code)) code = `EPSG:${code}`
-
+ 
   try {
     // epsg.io provides a proj4 text endpoint at https://epsg.io/<code>.proj4
     // e.g. https://epsg.io/3857.proj4 returns proj4 string for EPSG:3857
@@ -958,7 +1003,7 @@ const fetchProjDef = async (epsgCode: string): Promise<string | null> => {
     return null
   }
 }
-
+ 
 /**
  * Reproject a bbox from 'fromCrs' to 'toCrs'.
  * bbox expected as [minx,miny,maxx,maxy].
@@ -966,13 +1011,13 @@ const fetchProjDef = async (epsgCode: string): Promise<string | null> => {
  */
 const reprojectBbox = async (inputKey: string, fromCrs: string, toCrs: string) => {
   if (!inputKey) return
-
+ 
   try {
     await ensureProj4()
     // Normalize codes
     const f = (fromCrs || 'EPSG:4326').toString().replace(/^epsg:/i, 'EPSG:')
     const t = (toCrs || 'EPSG:4326').toString().replace(/^epsg:/i, 'EPSG:')
-
+ 
     // If proj4 already knows the code, use directly; otherwise fetch def and register alias.
     const ensureDef = async (code: string) => {
       const numeric = code.split(':')[1]
@@ -993,19 +1038,19 @@ const reprojectBbox = async (inputKey: string, fromCrs: string, toCrs: string) =
         return null
       }
     }
-
+ 
     const fCode = await ensureDef(f)
     const tCode = await ensureDef(t)
     if (!fCode || !tCode) {
       $q.notify({ type: 'warning', message: `Projection definition missing for ${!fCode ? f : t}. Reprojection skipped.` })
       return
     }
-
+ 
     const input = inputValues.value[inputKey]
     if (!input || !Array.isArray(input.bbox) || input.bbox.length < 4) return
-
+ 
     const [minx, miny, maxx, maxy] = input.bbox.map(Number)
-
+ 
     // Reproject the four corners
     const corners = [
       [minx, miny],
@@ -1013,7 +1058,7 @@ const reprojectBbox = async (inputKey: string, fromCrs: string, toCrs: string) =
       [maxx, miny],
       [maxx, maxy]
     ]
-
+ 
     const reprojected = corners.map(([x, y]) => {
       try {
         const out = proj4(fCode, tCode, [x, y])
@@ -1023,20 +1068,20 @@ const reprojectBbox = async (inputKey: string, fromCrs: string, toCrs: string) =
         return [NaN, NaN]
       }
     }).filter(c => !isNaN(c[0]) && !isNaN(c[1]))
-
+ 
     if (reprojected.length === 0) {
       $q.notify({ type: 'negative', message: 'Reprojection failed: no valid corner points' })
       return
     }
-
+ 
     const xs = reprojected.map(c => c[0])
     const ys = reprojected.map(c => c[1])
     const newBbox = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)].map(Number)
-
+ 
     // Update the inputValues with new bbox and the new crs
     inputValues.value[inputKey].bbox = newBbox
     inputValues.value[inputKey].crs = tCode
-
+ 
     // If map open, update drawn rectangle to reflect reprojected bbox (Leaflet expects lat/lng)
     // We'll convert to EPSG:4326 for Leaflet display if needed
     if (map) {
@@ -1057,35 +1102,35 @@ const reprojectBbox = async (inputKey: string, fromCrs: string, toCrs: string) =
         drawBboxOnMap(newBbox)
       }
     }
-
+ 
   } catch (e) {
     console.error('reprojectBbox error', e)
     $q.notify({ type: 'negative', message: 'Reprojection failed (see console)' })
   }
 }
-
+ 
 // helper to draw bbox rectangle on Leaflet map (bbox in EPSG:4326 lat/lon expected)
 const drawBboxOnMap = (bbox4326: number[]) => {
   if (!map || !drawLayer) return
-
+ 
   // ensure numeric values (sometimes they are strings)
   const nums = bbox4326.map(n => Number(n))
   if (nums.some(n => Number.isNaN(n))) return
-
+ 
   // remove previous drawn
   if (drawnFeature) {
     try { drawLayer.removeLayer(drawnFeature) } catch (e) { /* ignore */ }
     drawnFeature = null
   }
-
+ 
   // bbox4326 expected [minx,miny,maxx,maxy] where x=lon, y=lat
   const [minx, miny, maxx, maxy] = nums
   const bounds = [[miny, minx], [maxy, maxx]] // leaflet: [[southWestLat, westLng], [northEastLat, eastLng]]
-
+ 
   // create rectangle and add to drawLayer
   drawnFeature = L.rectangle(bounds)
   drawLayer.addLayer(drawnFeature)
-
+ 
   // enable Geoman editing for this layer (so user can drag corners later)
   if (drawnFeature.pm && typeof drawnFeature.pm.enable === 'function') {
     drawnFeature.pm.enable({ allowSelfIntersection: false })
@@ -1093,7 +1138,7 @@ const drawBboxOnMap = (bbox4326: number[]) => {
     // fallback: enable map-level edit mode (not ideal but safer)
     // map.pm.enableGlobalEditMode()
   }
-
+ 
   // wire edit events on the layer so changes update the bounding box in inputValues
   drawnFeature.on('pm:edit', () => updateBboxFromLayer())
   drawnFeature.on('pm:remove', () => {
@@ -1102,7 +1147,7 @@ const drawBboxOnMap = (bbox4326: number[]) => {
     }
     drawnFeature = null
   })
-
+ 
   // fit map to the rectangle
   try {
     map.fitBounds(bounds, { maxZoom: 12 })
@@ -1110,7 +1155,7 @@ const drawBboxOnMap = (bbox4326: number[]) => {
     console.warn('fitBounds failed', e)
   }
 }
-
+ 
 // Watch for changes to bbox crs values and reproject when user changes it
 watch(
   inputValues,
@@ -1131,6 +1176,45 @@ watch(
   { deep: true }
 )
 
+// Reproject displayed rectangle when user changes CRS while editing
+watch(
+  () => editingBboxKey.value ? inputValues.value[editingBboxKey.value]?.crs : null,
+  async (newCrs, oldCrs) => {
+    if (!map || !drawnFeature || !editingBboxKey.value) return;
+    if (!newCrs || newCrs === oldCrs) return;
+
+    // We want to keep displayed rectangle in EPSG:4326 for Leaflet,
+    // so convert the stored bbox (in newCrs) -> 4326 for display
+    try {
+      await ensureProj4();
+      let t = newCrs.toString();
+      if (/^\d+$/.test(t)) t = `EPSG:${t}`;
+      if (!/^EPSG:/i.test(t)) t = `EPSG:${t}`;
+
+      const input = inputValues.value[editingBboxKey.value];
+      if (!input || !Array.isArray(input.bbox) || input.bbox.length < 4) return;
+
+      // If stored CRS is not 4326, convert to 4326 for display
+      if (t !== 'EPSG:4326') {
+        const sw = proj4(t, 'EPSG:4326', [input.bbox[0], input.bbox[1]]);
+        const ne = proj4(t, 'EPSG:4326', [input.bbox[2], input.bbox[3]]);
+        const displayBbox = [
+          Math.min(sw[0], ne[0]),
+          Math.min(sw[1], ne[1]),
+          Math.max(sw[0], ne[0]),
+          Math.max(sw[1], ne[1])
+        ].map(Number);
+        drawBboxOnMap(displayBbox);
+      } else {
+        drawBboxOnMap(input.bbox.map(Number));
+      }
+    } catch (e) {
+      console.warn('Could not update displayed bbox after CRS change', e);
+    }
+  }
+);
+ 
+ 
 </script>
 
 <template>
@@ -1143,7 +1227,7 @@ watch(
       @click="helpVisible = true"
       class="q-mb-md"
     />
-    
+   
     <HelpDialog
       v-model="helpVisible"
       :help-content="helpContent"
@@ -1162,7 +1246,7 @@ watch(
 
           <!-- Version -->
           <div class="row q-mb-sm">
-            <div class="col-3 text-grey-7 text-weight-bold">Version</div>
+            <div class="col-3 text-grey-7 text-weight-bold">Software Version</div>
             <div class="col">
               {{ data.version || '—' }}
             </div>
@@ -1179,58 +1263,84 @@ watch(
             </div>
           </div>
 
-          <!-- Metadata -->
-          <div class="row q-mb-sm">
-            <div class="col-12 text-grey-7 text-weight-bold q-mb-xs">Additional Metadata</div>
+              <!-- Metadata -->
+                <div class="row q-mb-sm">
+                  <div class="col-12 text-weight-bold q-mb-xs">Additional Metadata</div>
 
-            <div v-if="data.metadata?.length" class="col-12">
+                  <div v-if="data.metadata?.length" class="col-12">
 
-              <div v-for="(md, index) in data.metadata" :key="index" class="q-pa-sm bg-white rounded-borders q-mb-sm shadow-1">
+                    <div
+                      v-for="(md, index) in data.metadata"
+                      :key="index"
+                      class="q-pa-sm bg-white rounded-borders q-mb-sm shadow-1"
+                    >
+                      <!-- Extract schema.org last part -->
+                      <template v-if="true">
+                        <div class="row items-start">
 
-                <!-- Detect Person -->
-                <div v-if="md.value && typeof md.value === 'object' && md.value['@type'] === 'Person'">
-                  <div class="text-weight-bold text-primary">👤 {{ md.title || 'Person' }}</div>
-                  <div class="q-mt-xs">
-                    <div><strong>Name:</strong> {{ md.value.name }}</div>
-                    <div v-if="md.value.role"><strong>Role:</strong> {{ md.value.role }}</div>
-                    <div v-if="md.value.email"><strong>Email:</strong> {{ md.value.email }}</div>
-                    <div v-if="md.value.affiliation"><strong>Affiliation:</strong> {{ md.value.affiliation }}</div>
+                          <!-- Icon + clickable schema link -->
+                          <a
+                            :href="md.role"
+                            target="_blank"
+                            class="q-mr-sm"
+                            style="text-decoration:none;"
+                          >
+                            <q-icon
+                              :name="iconMap[extractMetaType(md.role)] || 'info'"
+                              size="22px"
+                              class="text-primary"
+                            />
+                          </a>
+
+                          <div>
+                            <div class="text-weight-bold">
+                              {{ extractMetaType(md.role) }}
+                            </div>
+
+                            <!-- CASE 1: Person object -->
+                            <div v-if="md.value && typeof md.value === 'object' && md.value['@type'] === 'Person'" class="q-mt-xs">
+                              <div><strong>Name:</strong> {{ md.value.name }}</div>
+                              <div v-if="md.value.email"><strong>Email:</strong> {{ md.value.email }}</div>
+                              <div v-if="md.value.affiliation"><strong>Affiliation:</strong> {{ md.value.affiliation }}</div>
+                            </div>
+
+                            <!-- CASE 2: Normal text value -->
+                            <div v-else-if="md.title" class="text-grey-8">
+                              {{ md.title }}
+                            </div>
+                            <!-- CASE 3: Normal value -->
+                            <div v-else class="text-grey-8">
+                              {{ md.value }}
+                            </div>
+                            
+                          </div>
+
+                        </div>
+                      </template>
+
+                    </div>
+                  </div>
+
+                  <div v-else class="col-12">
+                  —
                   </div>
                 </div>
 
-                <!-- Default metadata -->
-                <div v-else>
-                  <div class="text-weight-bold">{{ md.title || md.role }}</div>
-                  <div class="text-grey-8">{{ md.value }}</div>
-                </div>
-
-              </div>
-
-              </div>
-
-
-            <div v-else class="col-12">
-              —
-            </div>
-          </div>
-
         </q-card-section>
-
-
         <q-separator class="q-mt-md" />
       </div>
-
+ 
       <!-- <h4>{{ data.id }} - {{ data.description }}</h4> -->
-
+ 
       <q-form @submit.prevent="validateAndSubmit">
-
+ 
         <div class="q-mb-lg">
           <div class="text-h4 text-weight-bold text-primary q-mb-sm">
             Inputs
           </div>
           <q-separator class="q-mt-md" />
         </div>
-
+ 
         <div v-for="(input, inputId) in data.inputs" :key="inputId" class="q-mb-md">
           <q-card class="q-pa-md" :ref="el => setInputRef(inputId, el)">
             <div class="row items-center q-mb-sm">
@@ -1239,12 +1349,12 @@ watch(
                 <span v-if="requiredInputs.includes(inputId)" class="text-red">*</span>
               </div>
             </div>
-
+ 
             <div class="q-gutter-sm">
               <q-badge color="grey-3" text-color="black" class="q-mb-sm">
                 {{ typeLabel(input, inputValues[inputId]) }}
               </q-badge>
-
+ 
               <!-- Complex Input (Multiple or Single) -->
               <template v-if="isComplexInput(input)">
                 <template v-if="Array.isArray(inputValues[inputId])">
@@ -1262,7 +1372,7 @@ watch(
                       type="radio"
                       inline
                     />
-
+ 
                     <template v-if="item.mode === 'href'">
                       <q-option-group
                         v-if="item.hrefOptions && item.hrefOptions.length > 0"
@@ -1281,7 +1391,7 @@ watch(
                         :error-message="validationErrors[inputId] ? 'This field is required' : ''"
                       />
                     </template>
-
+ 
                     <div v-else>
                       <q-select
                         v-model="item.format"
@@ -1301,7 +1411,7 @@ watch(
                         :error-message="validationErrors[inputId] ? 'This field is required' : ''"
                       />
                     </div>
-
+ 
                     <!-- Remove button -->
                     <q-btn
                       icon="delete"
@@ -1316,7 +1426,7 @@ watch(
                       <q-tooltip>Remove</q-tooltip>
                     </q-btn>
                   </div>
-
+ 
                   <!-- Add button -->
                   <q-btn
                     v-if="isMultipleInput(input)"
@@ -1328,7 +1438,7 @@ watch(
                     class="q-mt-sm"
                   />
                 </template>
-
+ 
                 <!-- Single Complex Input -->
                 <template v-else>
                   <q-option-group
@@ -1377,14 +1487,14 @@ watch(
                   </div>
                 </template>
               </template>
-
+ 
               <!--  Bounding Box Input with Leaflet Popup -->
               <template v-else-if="isBoundingBoxInput(input)">
                 <div class="bbox-input q-pa-sm bg-grey-1 rounded-borders">
                   <div class="text-subtitle1 text-weight-medium q-mb-xs">
                     {{ inputId }} (Bounding Box)
                   </div>
-
+ 
                   <!-- Show current bbox -->
                   <div class="q-mb-sm">
                     <q-badge color="blue-2" text-color="black" label="BBox:" />
@@ -1393,18 +1503,18 @@ watch(
                       <q-tooltip>Edit Bounding Box on Map</q-tooltip>
                     </q-btn>
                   </div>
-
+ 
                   <!-- CRS selector -->
                   <q-select
                     v-model="inputValues[inputId].crs"
-                    :options="['EPSG:4326', 'EPSG:3857', 'EPSG:32633', 'EPSG:27700']"
+                    :options="['EPSG:4326', 'EPSG:3857', 'EPSG:32611']"
                     label="CRS / EPSG"
                     filled
                     dense
                     emit-value
                     map-options
                   />
-
+ 
                   <!-- Optional: numeric bbox edit fields -->
                   <div class="row q-gutter-sm q-mt-sm">
                     <q-input
@@ -1420,7 +1530,7 @@ watch(
                   </div>
                 </div>
               </template>
-
+ 
               <!-- Multiple Value Input -->
               <template v-else-if="Array.isArray(inputValues[inputId])">
                 <div
@@ -1452,7 +1562,7 @@ watch(
                   </q-btn>
                 </div>
               </template>
-
+ 
               <!-- Literal Input -->
               <template v-else-if="!input.schema?.enum">
                 <q-input
@@ -1466,7 +1576,7 @@ watch(
                   :error-message="validationErrors[inputId] ? 'This field is required' : ''"
                 />
               </template>
-
+ 
               <!-- Enum Input -->
               <template v-else>
                 <q-select
@@ -1482,7 +1592,7 @@ watch(
             </div>
           </q-card>
         </div>
-
+ 
         <!-- Map Dialog (Only one global instance outside v-for) -->
         <q-dialog v-model="bboxDialogVisible" persistent>
           <q-card style="width: 90vw; max-width: 1000px; height: 80vh;">
@@ -1493,12 +1603,12 @@ watch(
               <q-space />
               <q-btn dense flat icon="close" v-close-popup />
             </q-bar>
-
+ 
             <!-- Map Section -->
             <q-card-section class="q-pa-none" style="height: calc(100% - 100px);">
               <div id="bbox-map" style="width:100%; height:100%;"></div>
             </q-card-section>
-
+ 
             <!-- Action Buttons -->
             <q-card-actions align="right" class="bg-grey-2">
               <q-btn flat label="Cancel" color="negative" @click="closeBboxPopup" />
@@ -1506,15 +1616,15 @@ watch(
             </q-card-actions>
           </q-card>
         </q-dialog>
-
-
+ 
+ 
         <div class="q-mb-lg">
           <div class="text-h4 text-weight-bold text-primary q-mb-sm">
             Outputs
           </div>
           <q-separator class="q-mt-md" />
         </div>
-
+ 
         <div v-for="(output, outputId) in data.outputs" :key="outputId" class="q-mb-md">
           <q-card class="q-pa-md">
               <div class="row items-center q-mb-sm">
@@ -1546,10 +1656,10 @@ watch(
                 style="flex: 1"
               >
               </q-select>
-
+ 
           </q-card>
         </div>
-
+ 
         <div class="q-mb-md">
           <q-card class="q-pa-md">
             <div class="row items-center q-mb-sm">
@@ -1559,7 +1669,7 @@ watch(
                 <q-tooltip>URLs to receive status notifications</q-tooltip>
               </q-icon>
             </div>
-
+ 
             <div class="q-gutter-md">
               <!-- Success URI -->
               <div class="q-gutter-sm row items-center">
@@ -1581,7 +1691,7 @@ watch(
                   </template>
                 </q-input>
               </div>
-
+ 
               <!-- In Progress URI -->
               <div class="q-gutter-sm row items-center">
                 <q-badge color="orange" text-color="white">
@@ -1602,7 +1712,7 @@ watch(
                   </template>
                 </q-input>
               </div>
-
+ 
               <!-- Failed URI -->
               <div class="q-gutter-sm row items-center">
                 <q-badge color="red" text-color="white">
@@ -1635,19 +1745,19 @@ watch(
             class="q-mb-md"
           />
         <div class="q-mt-md row q-gutter-sm">
-          <q-btn label="Submit" type="submit" color="primary"   
+          <q-btn label="Submit" type="submit" color="primary"  
           :loading="loading || submitting"
           :disable="loading || submitting" />
           <q-btn color="primary" outline label="Show JSON Preview" @click="showDialog = true" />
         </div>
       </q-form>
-
+ 
       <q-dialog v-model="showDialog" persistent>
         <q-card style="min-width: 70vw; max-width: 90vw;">
           <q-card-section>
             <div class="text-h6">Execute Request Confirmation</div>
           </q-card-section>
-
+ 
           <q-card-section class="q-pt-none">
             <q-banner dense class="bg-grey-2 text-black q-pa-sm">
               This is the full request that will be sent to the Execute endpoint:
@@ -1663,7 +1773,7 @@ watch(
       {{ jsonRequestPreview }}
             </pre> -->
           </q-card-section>
-
+ 
           <q-card-actions align="right">
             <q-btn flat label="Cancel" color="primary" v-close-popup />
             <q-btn
@@ -1676,11 +1786,11 @@ watch(
           </q-card-actions>
         </q-card>
       </q-dialog>
-
+ 
       <div v-if="submitting" class="text-caption text-primary q-mt-sm">
         Submitting...
       </div>
-
+ 
       <div class="q-mt-md" v-if="loading">
         <q-linear-progress
           :value="progressPercent / 100"
@@ -1688,21 +1798,21 @@ watch(
           size="lg"
           rounded
         />
-
+ 
      
         <div class="row items-center justify-between q-mt-xs">
           <div class="text-caption text-primary">
             <span v-if="progressMessage">{{ progressMessage }}</span>
             <span v-else>Status: {{ jobStatus }}</span>
           </div>
-
+ 
          
           <div class="text-caption text-primary text-bold">
             {{ progressPercent }}%
           </div>
         </div>
       </div>
-
+ 
       <div class="q-mt-lg" v-if="response">
         <h6>Execution Response</h6>
         <details>
@@ -1715,3 +1825,4 @@ watch(
   </q-page>
   </div>
 </template>
+ 
