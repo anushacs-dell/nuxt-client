@@ -123,8 +123,6 @@ const visualizeCwl = async (row: any) => {
     selectedProcess.value = metaData
  
 
-
-
     const url = `${config.public.NUXT_ZOO_BASEURL}/ogc-api/processes/${row.id}/package`
     const res = await fetch(url, {
       headers: {
@@ -150,6 +148,19 @@ const visualizeCwl = async (row: any) => {
     loadingCwl.value = false
   }
 }
+
+const iconMap: Record<string, string> = {
+  softwareVersion: "apps",
+  author: "person",
+  codeRepository: "cloud_upload",
+  license: "description",
+};
+
+// Convert URL - softwareVersion
+const extractMetaType = (role: string) => {
+  if (!role) return '';
+  return role.split("/").pop(); 
+};
 
 const onRowClick = async (evt, row, index) => {
   selectedProcess.value = row
@@ -418,24 +429,23 @@ const onClearSearch = async () => {
   <q-page class="q-pa-sm">
     <div class="row justify-center">
       <div class="col-12 q-pa-md" style="max-width: 1080px;">
-<p class="text-h4 q-mb-md text-weight-bold">{{ t('Processes List') }}</p>
 
-<!-- Buttons Row -->
-<div class="row items-center q-mb-md">
+        <p class="text-h4 q-mb-md text-weight-bold">{{ t('Processes List') }}</p>
 
-  <!-- Help Button -->
-  <q-btn
-    flat
-    icon="help_outline"
-    color="primary"
-    :label="t('Help')"
-    @click="helpVisible = true"
-  />
+        <!-- Buttons row -->
+        <div class="row items-center q-mb-md">
+          <!-- Help Button -->
+          <q-btn
+            flat
+            icon="help_outline"
+            color="primary"
+            :label="t('Help')"
+            @click="helpVisible = true"
+          />
 
-  <q-space />
+          <q-space />
 
-  <!-- Add Process Button -->
-
+          <!-- Add Process Button -->
           <q-btn
             v-if="isConformToCwl === true"
             color="primary"
@@ -444,17 +454,10 @@ const onClearSearch = async () => {
             @click="openDialog"
             :loading="isCheckingConformance"
           />
-      
+        </div>
 
-        <!-- Help Dialog -->
-        <HelpDialog
-          v-model="helpVisible"
-          title="Processes List Help"
-          :help-content="helpContent"
-        />
-
+        <HelpDialog v-model="helpVisible" title="Processes List Help" :help-content="helpContent" />
         <q-separator />
-
 
         <div class="q-mb-md">
           <q-input
@@ -483,7 +486,7 @@ const onClearSearch = async () => {
                 </q-td>
               </template>
             </q-table>
-            <!-- CWL Preview Section -->
+            <!-- CWL Preview Section (UNDER the table) -->
             <div v-if="selectedProcess" class="row q-col-gutter-lg q-mt-lg">
               <div class="col-8">
 
@@ -495,14 +498,8 @@ const onClearSearch = async () => {
               </div>
 
               
-               <div class="q-mt-md">
-                <p class="text-weight-bold">Additional Metadata</p>
-                <pre style="background:#f5f5f5; padding:6px; border-radius:4px; max-height:200px; overflow:auto;">
-                    {{ JSON.stringify(selectedProcess?.metadata, null, 2) }}
-                </pre>
               </div>
-              </div>
-              <!-- Right metadata -->
+              <!-- Right: metadata -->
               <div class="col-4 q-mt-xl">
                 <q-card flat bordered>
                   <q-card-section>
@@ -510,55 +507,136 @@ const onClearSearch = async () => {
                     <q-separator class="q-my-sm" />
 
                     <p><b>Description:</b> {{ selectedProcess?.description || '—' }}</p>
-                    <p><b>Version:</b> {{ selectedProcess?.version || '—' }}</p>
+                    
+                    <div class="row q-mb-sm items-center">
+                      <div class="text-weight-bold">Software Version:</div>
+                      <div class="q-ml-sm">{{ selectedProcess?.version || '—' }}</div>
+                    </div>
 
-                    <p><b>Keywords:</b></p>
-                    <ul v-if="selectedProcess?.keywords?.length">
-                      <li v-for="word in selectedProcess.keywords" :key="word">{{ word }}</li>
-                    </ul>
-                    <p v-else>—</p>
+
+                    <p><b>Keywords:</b>
+                      <span v-if="selectedProcess?.keywords?.length">
+                        {{ selectedProcess.keywords.join(', ') }}
+                      </span>
+                      <span v-else>—</span>
+                    </p>
+
 
                     <q-separator class="q-my-sm" />
 
                     <!-- Inputs Table -->
-                    <p class="text-weight-bold">Inputs</p>
-                    <q-table
-                      flat
-                      :rows="Object.entries(selectedProcess?.inputs || {}).map(([key, val]) => ({
-                        label: key,
-                        type: val?.schema?.type || val?.type || 'unknown',
-                        description: val?.description || '—'
-                      }))"
-                      :columns="[
-                        { name: 'label', label: 'Label', align: 'left', field: 'label' },
-                        { name: 'type', label: 'Type', align: 'left', field: 'type' },
-                        { name: 'description', label: 'Description', align: 'left', field: 'description' }
-                      ]"
-                      dense
-                      bordered
-                      no-data-label="No inputs"
-                    />
+                    <p class="text-weight-bold q-mt-md">Inputs</p>
+
+                    <table class="custom-table">
+                      <thead>
+                        <tr>
+                          <th>Label</th>
+                          <th>Type</th>
+                          <th>Description</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        <tr v-for="([key, val]) in Object.entries(selectedProcess?.inputs || {})" :key="key">
+                          <td>{{ key }}</td>
+                          <td>{{ val?.schema?.type || val?.type || 'unknown' }}</td>
+                          <td>{{ val?.description || '—' }}</td>
+                        </tr>
+
+                        <tr v-if="!Object.keys(selectedProcess?.inputs || {}).length">
+                          <td colspan="3" class="text-center text-grey">No inputs</td>
+                        </tr>
+                      </tbody>
+                    </table>
+
 
                     <q-separator class="q-my-sm" />
 
                     <!-- Outputs Table -->
-                    <p class="text-weight-bold">Outputs</p>
-                    <q-table
-                      flat
-                      :rows="Object.entries(selectedProcess?.outputs || {}).map(([key, val]) => ({
-                        label: key,
-                        type: val?.schema?.type || val?.type || 'unknown',
-                        description: val?.description || '—'
-                      }))"
-                      :columns="[
-                        { name: 'label', label: 'Label', align: 'left', field: 'label' },
-                        { name: 'type', label: 'Type', align: 'left', field: 'type' },
-                        { name: 'description', label: 'Description', align: 'left', field: 'description' }
-                      ]"
-                      dense
-                      bordered
-                      no-data-label="No outputs"
-                    />
+                    <p class="text-weight-bold q-mt-md">Outputs</p>
+
+                    <table class="custom-table">
+                      <thead>
+                        <tr>
+                          <th>Label</th>
+                          <th>Type</th>
+                          <th>Description</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        <tr v-for="([key, val]) in Object.entries(selectedProcess?.outputs || {})" :key="key">
+                          <td>{{ key }}</td>
+                          <td>{{ val?.schema?.type || val?.type || 'unknown' }}</td>
+                          <td>{{ val?.description || '—' }}</td>
+                        </tr>
+
+                        <tr v-if="!Object.keys(selectedProcess?.outputs || {}).length">
+                          <td colspan="3" class="text-center text-grey">No outputs</td>
+                        </tr>
+                      </tbody>
+                    </table>
+
+                <q-separator class="q-my-sm" />
+
+                <div class="row q-mb-sm">
+                  <div class="col-12 text-weight-bold q-mb-xs">Additional Metadata</div>
+
+                  <div v-if="selectedProcess.metadata?.length" class="col-12">
+
+                    <div
+                      v-for="(md, index) in selectedProcess.metadata"
+                      :key="index"
+                      class="q-pa-sm bg-white rounded-borders q-mb-sm shadow-1"
+                    >
+                      <!-- Extract schema.org last part -->
+                      <template v-if="true">
+                        <div class="row items-start">
+
+                          <!-- Icon + clickable schema link -->
+                          <a
+                            :href="md.role"
+                            target="_blank"
+                            class="q-mr-sm"
+                            style="text-decoration:none;"
+                          >
+                            <q-icon
+                              :name="iconMap[extractMetaType(md.role)] || 'info'"
+                              size="22px"
+                              class="text-primary"
+                            />
+                          </a>
+
+                          <div>
+                            <div class="text-weight-bold">
+                              {{ extractMetaType(md.role) }}
+                            </div>
+
+                            <!-- CASE 1: Person object -->
+                            <div v-if="md.value && typeof md.value === 'object' && md.value['@type'] === 'Person'" class="q-mt-xs">
+                              <div><strong>Name:</strong> {{ md.value.name }}</div>
+                              <div v-if="md.value.email"><strong>Email:</strong> {{ md.value.email }}</div>
+                              <div v-if="md.value.affiliation"><strong>Affiliation:</strong> {{ md.value.affiliation }}</div>
+                            </div>
+
+                            <!-- CASE 2: Normal text value -->
+                            <div v-else-if="md.title" class="text-grey-8">
+                              {{ md.title }}
+                            </div>
+                            <!-- CASE 3: Normal value -->
+                            <div v-else class="text-grey-8">
+                              {{ md.value }}
+                            </div>
+                          </div>
+
+                        </div>
+                      </template>
+
+                    </div>
+                  </div>
+
+                  <div v-else class="col-12">—</div>
+                </div>
 
                   </q-card-section>
                 </q-card>
@@ -625,7 +703,32 @@ const onClearSearch = async () => {
 
   </q-page>
 </template>
-
 <style>
+.custom-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  background: white;
+  border-radius: 4px;
+  overflow: hidden;
+  font-size: 14px;
+}
+
+.custom-table th {
+  background: #f2f2f2;
+  padding: 8px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+  font-weight: bold;
+}
+
+.custom-table td {
+  padding: 8px;
+  border-bottom: 1px solid #eee;
+}
+
+.custom-table tr:last-child td {
+  border-bottom: none;
+}
 
 </style>
