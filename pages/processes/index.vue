@@ -17,9 +17,11 @@ const config = useRuntimeConfig()
 const data = ref<any>(null)
 const filter = ref('')
 const router = useRouter()
-const modalContent = ref('')
+const modalContent = ref<string | null>(null)
+const packageError = ref<string | null>(null)
 const showModal = ref(false)
 const selectedPackageProcessId = ref('')
+
 
 
 const helpVisible = ref(false)
@@ -48,8 +50,10 @@ const viewProcess = (row: any) => {
 
 // fetch package 
 const packageProcess = async (row: any) => {
+  selectedPackageProcessId.value = row.id //store Id for filename
+  modalContent.value = null
+  packageError.value = null
   try {
-    selectedPackageProcessId.value = row.id //store Id for filename
     const response = await fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/processes/${row.id}/package`, {
       method: 'GET',
       headers: {
@@ -59,19 +63,26 @@ const packageProcess = async (row: any) => {
       }
     })
     if (response.ok) {
-      console.log('Application Package downloaded successfully')
       modalContent.value = await response.text()
-      showModal.value = true
+    } else if (response.status === 404) {
+      packageError.value = t(
+        'Application package is not available. It may have been removed after a service restart.'
+      )
     } else {
-      console.error('Error downloading Application Package')
-      showModal.value = false
+      packageError.value = t(
+        'Failed to load application package.'
+      )
     }
+
+    showModal.value = true
   } catch (error) {
     console.error('Application Package request failed', error)
-    showModal.value = false
+    packageError.value = t(
+      'Unable to reach the server to retrieve the application package.'
+    )
+    showModal.value = true
   }
 }
-
 
 const downloadCWL = () => {
   if (!modalContent.value) return;
@@ -178,8 +189,11 @@ const visualizeCwl = async (row: any) => {
 const iconMap: Record<string, string> = {
   softwareVersion: "apps",
   author: "person",
-  codeRepository: "cloud_upload",
+  contributor: "group",
+  organization: "business",
   license: "description",
+  keywords: "tag",
+  codeRepository: "cloud_upload",
 };
 
 // Convert URL - softwareVersion
@@ -187,6 +201,17 @@ const extractMetaType = (role: string) => {
   if (!role) return '';
   return role.split("/").pop(); 
 };
+
+const isUrl = (value) => {
+  if (typeof value !== "string") return false;
+  return value.startsWith("http://") || value.startsWith("https://");
+};
+
+const openSchema = (url) => {
+  window.open(url, "_blank");
+};
+
+
 
 const onRowClick = async (evt, row, index) => {
   selectedProcess.value = row
@@ -605,64 +630,124 @@ const onClearSearch = async () => {
 
                 <q-separator class="q-my-sm" />
 
-                <div class="row q-mb-sm">
-                  <div class="col-12 text-weight-bold q-mb-xs">Additional Metadata</div>
+                <q-expansion-item
+                  expand-separator
+                  icon="info"
+                  label="Additional Metadata"
+                  dense
+                  dense-toggle
+                  class="rounded-borders bg-white q-mt-md shadow-1"
+                >
+                  <q-card-section>
 
-                  <div v-if="selectedProcess.metadata?.length" class="col-12">
+                    <div v-if="selectedProcess.metadata?.length">
 
-                    <div
-                      v-for="(md, index) in selectedProcess.metadata"
-                      :key="index"
-                      class="q-pa-sm bg-white rounded-borders q-mb-sm shadow-1"
-                    >
-                      <!-- Extract schema.org last part -->
-                      <template v-if="true">
-                        <div class="row items-start">
+                      <div
+                        v-for="(md, i) in selectedProcess.metadata"
+                        :key="i"
+                        class="q-py-sm q-mb-sm border-bottom"
+                        style="border-bottom: 1px solid #eee;"
+                      >
 
-                          <!-- Icon + clickable schema link -->
-                          <a
-                            :href="md.role"
-                            target="_blank"
-                            class="q-mr-sm"
-                            style="text-decoration:none;"
-                          >
-                            <q-icon
-                              :name="iconMap[extractMetaType(md.role)] || 'info'"
-                              size="22px"
-                              class="text-primary"
-                            />
-                          </a>
+                    <div class="row items-center q-mb-xs">
 
-                          <div>
-                            <div class="text-weight-bold">
-                              {{ extractMetaType(md.role) }}
-                            </div>
+                      <!-- ICON (left side, decorative only) -->
+                      <q-icon
+                        :name="iconMap[extractMetaType(md.role)] || 'info'"
+                        size="18px"
+                        class="text-primary q-mr-sm"
+                      />
 
-                            <!-- CASE 1: Person object -->
-                            <div v-if="md.value && typeof md.value === 'object' && md.value['@type'] === 'Person'" class="q-mt-xs">
-                              <div><strong>Name:</strong> {{ md.value.name }}</div>
-                              <div v-if="md.value.email"><strong>Email:</strong> {{ md.value.email }}</div>
-                              <div v-if="md.value.affiliation"><strong>Affiliation:</strong> {{ md.value.affiliation }}</div>
-                            </div>
-
-                            <!-- CASE 2: Normal text value -->
-                            <div v-else-if="md.title" class="text-grey-8">
-                              {{ md.title }}
-                            </div>
-                            <!-- CASE 3: Normal value -->
-                            <div v-else class="text-grey-8">
-                              {{ md.value }}
-                            </div>
-                          </div>
-
-                        </div>
-                      </template>
+                      <!-- LABEL (clickable - schema.org page) -->
+                        <div
+                          class="text-weight-bold text-primary"
+                          :class="{ 'cursor-pointer': md.role }"
+                          @click="md.role && openSchema(md.role)"
+                        >
+                        {{ md.role ? extractMetaType(md.role) : md.title }}
+                      </div>
 
                     </div>
-                  </div>
+                      <!--title-only metadata -->
+                      <div v-if="md.title && !md.value" class="q-mt-xs text-grey-8">
+                        {{ md.title }}
+                      </div>
 
-                  <div v-else class="col-12">—</div>
-                </div>
+                        <!--Person object -->
+                        <div
+                          v-if="md.value?.['@type'] === 'Person'"
+                          class="q-mt-xs text-grey-8"
+                        >
+                          <div><strong>Name:</strong> {{ md.value.name }}</div>
+                          <div v-if="md.value.email">
+                            <strong>Email:</strong>
+                            <a :href="'mailto:' + md.value.email" class="text-primary">{{ md.value.email }}</a>
+                          </div>
+                          <div v-if="md.value.affiliation">
+                            <strong>Affiliation:</strong> {{ md.value.affiliation }}
+                          </div>
+                        </div>
+
+                        <!-- Organization object -->
+                        <div
+                          v-else-if="md.value?.['@type'] === 'Organization'"
+                          class="q-mt-xs text-grey-8"
+                        >
+                          <div><strong>Name:</strong> {{ md.value.name }}</div>
+
+                          <div v-if="md.value.url">
+                            <strong>URL:</strong>
+                            <a :href="md.value.url" target="_blank" class="text-primary">
+                              {{ md.value.url }}
+                            </a>
+                          </div>
+
+                          <div v-if="md.value.address">
+                            <strong>Country:</strong>
+                            {{
+                              md.value.address.addressCountry ||
+                              md.value.address["s:addressCountry"] ||
+                              md.value.address.country ||
+                              '—'
+                            }}
+                          </div>
+                        </div>
+
+                        <!-- Simple string value -->
+                        <div v-else-if="typeof md.value === 'string'" class="q-mt-xs text-grey-8">
+                          {{ md.value }}
+                        </div>
+
+                        <!-- Nested object -->
+                        <div v-else-if="typeof md.value === 'object'" class="q-mt-xs">
+                          <div
+                            v-for="(v, key) in md.value"
+                            :key="key"
+                            class="q-mb-xs text-grey-8"
+                          >
+                            <strong>{{ key }}:</strong>
+                            
+                            <!-- If URL inside nested value -->
+                            <template v-if="isUrl(v)">
+                              <a :href="v" target="_blank" class="text-primary">{{ v }}</a>
+                            </template>
+
+                            <template v-else>
+                              {{ v }}
+                            </template>
+                          </div>
+                        </div>
+
+                      </div>
+
+                    </div>
+
+                    <div v-else class="text-grey-6">
+                      —
+                    </div>
+
+                  </q-card-section>
+                </q-expansion-item>
 
                   </q-card-section>
                 </q-card>
@@ -731,7 +816,16 @@ const onClearSearch = async () => {
               />
             </div>
           </div>
-          <div v-else class="text-negative">No data or failed to fetch.</div>
+          <!-- ERROR -->
+          <div v-else-if="packageError" class="text-negative">
+            <q-icon name="warning" size="18px" class="q-mr-sm" />
+            {{ packageError }}
+          </div>
+
+          <!-- LOADING / EMPTY -->
+          <div v-else class="text-grey-6">
+            {{ t('Loading package information...') }}
+          </div>
         </q-card-section>
       </q-card>
     </q-dialog>
