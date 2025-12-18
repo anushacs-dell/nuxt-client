@@ -43,6 +43,9 @@ const editingBboxKey = ref<string | null>(null)
 let map: L.Map | null = null
 let drawLayer: L.LayerGroup | null = null
 let drawnFeature: L.Layer | null = null
+const enabledInputs = reactive<Record<string, boolean>>({})
+const isCanceling = ref(false)
+const jobCanceled = ref(false)
  
  
 // Helper to extract a default bbox from various schema styles (old & new)
@@ -140,6 +143,12 @@ const fetchData = async () => {
         if (input.minOccurs !== 0) {
           requiredInputs.value.push(key)
         }
+
+       if (input.minOccurs === 0) {
+          enabledInputs[key] = false;
+        } else {
+          enabledInputs[key] = true;
+        }
  
         // COMPLEX input (single or oneOf/contentMediaType)
         if (hasContentMedia(input.schema)) {
@@ -230,7 +239,7 @@ const fetchData = async () => {
           const defaultBbox = getDefaultBbox(input);
           inputValues.value[key] = reactive({
             bbox: defaultBbox,
-            crs: bboxInfo.crsDefault || 'EPSG:4326',
+            crs: normalizeCrsForProj4(bboxInfo.crsDefault || 'EPSG:4326'),
             _schemaPropName: bboxInfo.propName
           });
           continue;
@@ -440,10 +449,15 @@ watch(
  
       // ✅ ADD THIS: handle Bounding Box inputs first
       if (val && typeof val === 'object' && 'bbox' in val) {
-        formattedInputs[key] = {
-          bbox: val.bbox,
-          crs: val.crs || 'EPSG:4326'
-        }
+        const toUrn = (crs: string) => {
+        const epsg = normalizeCrsForProj4(crs)
+        const code = epsg.split(':')[1]
+        return `urn:ogc:def:crs:EPSG:6.6:${code}`
+      }
+      formattedInputs[key] = {
+        bbox: val.bbox,
+        crs: toUrn(val.crs || 'EPSG:4326')
+      }
         continue
       }
  
@@ -669,6 +683,11 @@ const submitProcess = async () => {
               console.log("Ignored WS message, not for this job:", msgJobId, msgId);
             return;
           }
+
+          if (jobStatus.value === 'canceled') {
+            loading.value = false
+            ws?.close()
+          }
  
           // handle progress
           if (msg.progress !== undefined) progressPercent.value = msg.progress;
@@ -812,6 +831,20 @@ const openBboxPopup = (inputKey: string) => {
   bboxDialogVisible.value = true
   nextTick(() => initMap())
 }
+
+const normalizeCrsForProj4 = (crs: string): string => {
+  if (!crs) return 'EPSG:4326'
+  // urn:ogc:def:crs:EPSG:6.6:4326 → EPSG:4326
+  const urnMatch = crs.match(/EPSG(?::\d+\.\d+)?:?(\d+)/i)
+  if (urnMatch) {
+    return `EPSG:${urnMatch[1]}`
+  }
+  // numeric only
+  if (/^\d+$/.test(crs)) {
+    return `EPSG:${crs}`
+  }
+  return crs
+}
  
 const initMap = () => {
   if (!process.client || !L) return
@@ -825,7 +858,7 @@ const initMap = () => {
   }
  
   //  Initialize map
-  map = L.map('bbox-map').setView([25.2, 55.3], 4) // default center (adjust as needed)
+  map = L.map('bbox-map').setView([0, 0], 0) // default center (adjust as needed)
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map)
@@ -852,7 +885,8 @@ const initMap = () => {
   // draw current bbox for editing (convert to 4326 for Leaflet if needed)
   const current = editingBboxKey.value ? inputValues.value[editingBboxKey.value] : null
     if (current && Array.isArray(current.bbox) && current.bbox.length === 4) {
-    const crs = current.crs || 'EPSG:4326'
+    const rawCrs = current.crs || 'EPSG:4326'
+    const crs = normalizeCrsForProj4(rawCrs)
     if (crs !== 'EPSG:4326') {
       ensureProj4().then(() => {
         try {
@@ -919,9 +953,9 @@ const updateBboxFromLayer = async () => {
   ];
 
   // Get the desired / user-selected CRS for this input (normalize to EPSG:####)
-  let desiredCrs = (inputValues.value[editingBboxKey.value]?.crs || 'EPSG:4326').toString();
-  if (/^\d+$/.test(desiredCrs)) desiredCrs = `EPSG:${desiredCrs}`;
-  if (!/^EPSG:/i.test(desiredCrs)) desiredCrs = `EPSG:${desiredCrs}`;
+  let desiredCrs = normalizeCrsForProj4(
+    inputValues.value[editingBboxKey.value]?.crs || 'EPSG:4326'
+  )
 
   // If desired is not 4326 we must convert the drawn (4326) bbox to desiredCrs
   if (desiredCrs !== 'EPSG:4326') {
@@ -1028,8 +1062,8 @@ const reprojectBbox = async (inputKey: string, fromCrs: string, toCrs: string) =
   try {
     await ensureProj4()
     // Normalize codes
-    const f = (fromCrs || 'EPSG:4326').toString().replace(/^epsg:/i, 'EPSG:')
-    const t = (toCrs || 'EPSG:4326').toString().replace(/^epsg:/i, 'EPSG:')
+    const f = normalizeCrsForProj4(fromCrs || 'EPSG:4326')
+    const t = normalizeCrsForProj4(toCrs || 'EPSG:4326')
  
     // If proj4 already knows the code, use directly; otherwise fetch def and register alias.
     const ensureDef = async (code: string) => {
@@ -1128,6 +1162,12 @@ const drawBboxOnMap = (bbox4326: number[]) => {
  
   // ensure numeric values (sometimes they are strings)
   const nums = bbox4326.map(n => Number(n))
+  if (
+    nums.some(n => Number.isNaN(n)) ||
+    (nums[0] === 0 && nums[1] === 0 && nums[2] === 0 && nums[3] === 0)
+  ) {
+    return
+  }
   if (nums.some(n => Number.isNaN(n))) return
  
   // remove previous drawn
@@ -1175,6 +1215,10 @@ watch(
   (newInputs, oldInputs) => {
     // iterate inputs, find bbox entries where crs changed
     for (const [key, val] of Object.entries(newInputs)) {
+      // Skip optional inputs that are not enabled
+     if (data.value?.inputs?.[key]?.minOccurs === 0 && !enabledInputs[key]) {
+        continue
+      }
       const old = oldInputs ? (oldInputs as any)[key] : undefined
       if (val && typeof val === 'object' && 'bbox' in val && 'crs' in val) {
         const newCrs = val.crs
@@ -1189,43 +1233,90 @@ watch(
   { deep: true }
 )
 
-// Reproject displayed rectangle when user changes CRS while editing
 watch(
   () => editingBboxKey.value ? inputValues.value[editingBboxKey.value]?.crs : null,
   async (newCrs, oldCrs) => {
-    if (!map || !drawnFeature || !editingBboxKey.value) return;
-    if (!newCrs || newCrs === oldCrs) return;
+    if (!map || !drawnFeature || !editingBboxKey.value) return
+    if (!newCrs || newCrs === oldCrs) return
 
-    // We want to keep displayed rectangle in EPSG:4326 for Leaflet,
-    // so convert the stored bbox (in newCrs) -> 4326 for display
     try {
-      await ensureProj4();
-      let t = newCrs.toString();
-      if (/^\d+$/.test(t)) t = `EPSG:${t}`;
-      if (!/^EPSG:/i.test(t)) t = `EPSG:${t}`;
+      await ensureProj4()
 
-      const input = inputValues.value[editingBboxKey.value];
-      if (!input || !Array.isArray(input.bbox) || input.bbox.length < 4) return;
+      const t = normalizeCrsForProj4(newCrs)
 
-      // If stored CRS is not 4326, convert to 4326 for display
+      const input = inputValues.value[editingBboxKey.value]
+      if (!input || !Array.isArray(input.bbox) || input.bbox.length < 4) return
+
+      // Convert stored bbox → EPSG:4326 for Leaflet display
       if (t !== 'EPSG:4326') {
-        const sw = proj4(t, 'EPSG:4326', [input.bbox[0], input.bbox[1]]);
-        const ne = proj4(t, 'EPSG:4326', [input.bbox[2], input.bbox[3]]);
+        const sw = proj4(t, 'EPSG:4326', [input.bbox[0], input.bbox[1]])
+        const ne = proj4(t, 'EPSG:4326', [input.bbox[2], input.bbox[3]])
+
         const displayBbox = [
           Math.min(sw[0], ne[0]),
           Math.min(sw[1], ne[1]),
           Math.max(sw[0], ne[0]),
           Math.max(sw[1], ne[1])
-        ].map(Number);
-        drawBboxOnMap(displayBbox);
+        ].map(Number)
+
+        drawBboxOnMap(displayBbox)
       } else {
-        drawBboxOnMap(input.bbox.map(Number));
+        drawBboxOnMap(input.bbox.map(Number))
       }
     } catch (e) {
-      console.warn('Could not update displayed bbox after CRS change', e);
+      console.warn('Could not update displayed bbox after CRS change', e)
     }
   }
-);
+)
+
+// Initialize for optional inputs after `data` is loaded
+watch(data, (val) => {
+  if (!val?.inputs) return
+
+  for (const [key, input] of Object.entries(val.inputs)) {
+    if (input.minOccurs === 0 && !(key in enabledInputs)) {
+      enabledInputs[key] = false
+    }
+  }
+})
+
+async function cancelJob() {
+  if (!jobId.value) return
+  isCanceling.value = true
+  try {
+    const url = `${config.public.NUXT_ZOO_BASEURL}/ogc-api/jobs/${jobId.value}`
+    await $fetch(url, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${authStore.token.access_token}`
+      }
+    })
+    jobStatus.value = 'canceled'
+    loading.value = false              
+    submitting.value = false         
+    jobId.value = null                 
+    stopJobTracking()
+    $q.notify({
+      type: 'warning',
+      message: 'Execution canceled'
+    })
+  } catch (err) {
+    console.error(err)
+    $q.notify({
+      type: 'negative',
+      message: 'Failed to cancel job'
+    })
+  } finally {
+    isCanceling.value = false
+  }
+}
+
+function stopJobTracking() {
+  if (ws) {
+    ws.close()
+    ws = null
+  }
+}
  
  
 </script>
@@ -1411,12 +1502,22 @@ watch(
  
         <div v-for="(input, inputId) in data.inputs" :key="inputId" class="q-mb-md">
           <q-card class="q-pa-md" :ref="el => setInputRef(inputId, el)">
-            <div class="row items-center q-mb-sm">
+            <div class="row items-center justify-between q-mb-sm">
               <div class="text-blue text-bold">
                 {{ inputId.toUpperCase() }}
                 <span v-if="requiredInputs.includes(inputId)" class="text-red">*</span>
               </div>
+
+              <!-- Enable checkbox for optional input -->
+              <q-checkbox
+                v-if="input.minOccurs === 0"
+                v-model="enabledInputs[inputId]"
+                :label="`Enable`"
+                dense
+              />
             </div>
+          <div v-if="enabledInputs[inputId] || input.minOccurs !== 0"
+           :class="input.minOccurs === 0 ? 'q-pa-sm bg-grey-1 rounded-borders' : ''">
  
             <div class="q-gutter-sm">
               <q-badge color="grey-3" text-color="black" class="q-mb-sm">
@@ -1658,6 +1759,7 @@ watch(
                 />
               </template>
             </div>
+          </div>
           </q-card>
         </div>
  
@@ -1813,10 +1915,23 @@ watch(
             class="q-mb-md"
           />
         <div class="q-mt-md row q-gutter-sm">
-          <q-btn label="Submit" type="submit" color="primary"  
-          :loading="loading || submitting"
-          :disable="loading || submitting" />
+          <q-btn
+            label="Submit"
+            type="submit"
+            color="primary"
+            :loading="loading || submitting"
+            :disable="jobStatus === 'running' || jobStatus === 'submitted'"
+          />
           <q-btn color="primary" outline label="Show JSON Preview" @click="showDialog = true" />
+          <div v-if="jobStatus === 'running' || jobStatus === 'submitted'" class="q-mt-md">
+            <q-btn
+              label="Cancel"
+              color="negative"
+              icon="cancel"
+              :loading="isCanceling"
+              @click="cancelJob"
+            />
+          </div> 
         </div>
       </q-form>
  
