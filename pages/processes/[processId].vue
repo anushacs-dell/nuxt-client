@@ -47,6 +47,7 @@ const enabledInputs = reactive<Record<string, boolean>>({})
 const isCanceling = ref(false)
 const jobCanceled = ref(false)
  
+ 
 // Helper to extract a default bbox from various schema styles (old & new)
 const getDefaultBbox = (schema: any) => {
   //  Try the new schema style: ogc-bbox with allOf references
@@ -947,6 +948,12 @@ const updateBboxFromLayer = async () => {
     inputValues.value[editingBboxKey.value]?.crs || 'EPSG:4326'
   )
 
+
+  // Get the desired / user-selected CRS for this input (normalize to EPSG:####)
+  let desiredCrs = (inputValues.value[editingBboxKey.value]?.crs || 'EPSG:4326').toString();
+  if (/^\d+$/.test(desiredCrs)) desiredCrs = `EPSG:${desiredCrs}`;
+  if (!/^EPSG:/i.test(desiredCrs)) desiredCrs = `EPSG:${desiredCrs}`;
+
   // If desired is not 4326 we must convert the drawn (4326) bbox to desiredCrs
   if (desiredCrs !== 'EPSG:4326') {
     try {
@@ -1159,6 +1166,7 @@ const drawBboxOnMap = (bbox4326: number[]) => {
   ) {
     return
   }
+  if (nums.some(n => Number.isNaN(n))) return
  
   // remove previous drawn
   if (drawnFeature) {
@@ -1317,6 +1325,8 @@ function stopJobTracking() {
   }
 }
 
+ 
+ 
 </script>
 
 <template>
@@ -1460,6 +1470,8 @@ function stopJobTracking() {
               />
             </div>
           <div v-if="enabledInputs[inputId] || input.minOccurs !== 0" :class="input.minOccurs === 0 ? 'q-pa-sm bg-grey-1 rounded-borders' : ''">
+            </div>
+ 
             <div class="q-gutter-sm">
               <q-badge color="grey-3" text-color="black" class="q-mb-sm">
                 {{ typeLabel(input, inputValues[inputId]) }}
@@ -1863,6 +1875,9 @@ function stopJobTracking() {
             :loading="loading || submitting"
             :disable="jobStatus === 'running' || jobStatus === 'submitted'"
           />
+          <q-btn label="Submit" type="submit" color="primary"  
+          :loading="loading || submitting"
+          :disable="loading || submitting" />
           <q-btn color="primary" outline label="Show JSON Preview" @click="showDialog = true" />
           <div v-if="jobStatus === 'running' || jobStatus === 'submitted'" class="q-mt-md">
             <q-btn
