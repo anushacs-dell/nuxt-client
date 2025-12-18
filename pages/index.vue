@@ -26,7 +26,10 @@
           <q-card-section>
             <div class="text-h6">{{ apiInfo.title }}</div>
             <div class="text-subtitle2">{{ t('Version') }}: {{ apiInfo.version }}</div>
-            <div class="q-mt-sm">{{ apiInfo.description }}</div>
+            <div
+              class="q-mt-sm markdown-content"
+              v-html="renderedDescription"
+            />
 
             <div class="q-mt-sm">
               {{ t('Contact') }}: {{ apiInfo.contact?.name }} ({{ apiInfo.contact?.email }})
@@ -120,6 +123,7 @@ import { useRuntimeConfig } from '#imports'
 import { useI18n } from 'vue-i18n'
 import HelpDialog from '../components/help/HelpDialog.vue'
 import HomepageHelp from '../components/help/HomepageHelp.js'
+import MarkdownIt from 'markdown-it'
 
 const { locale, t } = useI18n()
 
@@ -130,8 +134,20 @@ const config = useRuntimeConfig()
 const helpVisible = ref(false)
 const helpContent = HomepageHelp
 
+const md = new MarkdownIt({
+  html: true,        
+  linkify: true,     
+  typographer: true
+})
+
 const landingUrl = `${config.public.NUXT_ZOO_BASEURL}/ogc-api/`
 const apiSpecUrl = `${config.public.NUXT_ZOO_BASEURL}/ogc-api/api`
+
+const renderedDescription = computed(() => {
+  if (!apiInfo.value?.description) return ''
+  return md.render(apiInfo.value.description)
+})
+
 
 const fetchLandingAndApiInfo = async () => {
   loading.value = true
@@ -188,3 +204,39 @@ const getReadableLinkText = (link: any): string => {
 
 onMounted(fetchLandingAndApiInfo)
 </script>
+
+<style scoped>
+:deep(.markdown-content h1) {
+  font-size: 2rem;        
+  font-weight: 500;
+  line-height: 2.5rem;
+  margin: 16px 0;
+}
+
+:deep(.markdown-content h2) {
+  font-size: 1.5rem;      
+  font-weight: 500;
+  line-height: 2rem;
+  margin: 14px 0;
+}
+
+:deep(.markdown-content h3) {
+  font-size: 1.25rem;
+  font-weight: 500;
+  margin: 12px 0;
+}
+
+:deep(.markdown-content p) {
+  margin: 8px 0;
+}
+
+:deep(.markdown-content ul) {
+  padding-left: 20px;
+}
+
+:deep(.markdown-content a) {
+  color: var(--q-primary);
+  text-decoration: underline;
+}
+</style>
+

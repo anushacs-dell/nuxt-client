@@ -144,7 +144,7 @@ const fetchData = async () => {
           requiredInputs.value.push(key)
         }
 
-        if (input.minOccurs === 0) {
+       if (input.minOccurs === 0) {
           enabledInputs[key] = false;
         } else {
           enabledInputs[key] = true;
@@ -372,8 +372,11 @@ watch(
 const iconMap: Record<string, string> = {
   softwareVersion: "apps",
   author: "person",
-  codeRepository: "cloud_upload",
+  contributor: "group",
+  organization: "business",
   license: "description",
+  keywords: "tag",
+  codeRepository: "cloud_upload",
 };
 
 // Convert URL - softwareVersion
@@ -381,6 +384,16 @@ const extractMetaType = (role: string) => {
   if (!role) return '';
   return role.split("/").pop(); 
 };
+
+const isUrl = (value) => {
+  if (typeof value !== "string") return false;
+  return value.startsWith("http://") || value.startsWith("https://");
+};
+
+const openSchema = (url) => {
+  window.open(url, "_blank");
+};
+
  
 onMounted(async () => {
   if (process.client) {
@@ -821,22 +834,18 @@ const openBboxPopup = (inputKey: string) => {
 
 const normalizeCrsForProj4 = (crs: string): string => {
   if (!crs) return 'EPSG:4326'
-
   // urn:ogc:def:crs:EPSG:6.6:4326 → EPSG:4326
   const urnMatch = crs.match(/EPSG(?::\d+\.\d+)?:?(\d+)/i)
   if (urnMatch) {
     return `EPSG:${urnMatch[1]}`
   }
-
   // numeric only
   if (/^\d+$/.test(crs)) {
     return `EPSG:${crs}`
   }
-
   return crs
 }
-
-
+ 
 const initMap = () => {
   if (!process.client || !L) return
   const mapContainer = document.getElementById('bbox-map')
@@ -948,12 +957,6 @@ const updateBboxFromLayer = async () => {
     inputValues.value[editingBboxKey.value]?.crs || 'EPSG:4326'
   )
 
-
-  // Get the desired / user-selected CRS for this input (normalize to EPSG:####)
-  let desiredCrs = (inputValues.value[editingBboxKey.value]?.crs || 'EPSG:4326').toString();
-  if (/^\d+$/.test(desiredCrs)) desiredCrs = `EPSG:${desiredCrs}`;
-  if (!/^EPSG:/i.test(desiredCrs)) desiredCrs = `EPSG:${desiredCrs}`;
-
   // If desired is not 4326 we must convert the drawn (4326) bbox to desiredCrs
   if (desiredCrs !== 'EPSG:4326') {
     try {
@@ -1061,7 +1064,7 @@ const reprojectBbox = async (inputKey: string, fromCrs: string, toCrs: string) =
     // Normalize codes
     const f = normalizeCrsForProj4(fromCrs || 'EPSG:4326')
     const t = normalizeCrsForProj4(toCrs || 'EPSG:4326')
-
+ 
     // If proj4 already knows the code, use directly; otherwise fetch def and register alias.
     const ensureDef = async (code: string) => {
       const numeric = code.split(':')[1]
@@ -1159,7 +1162,6 @@ const drawBboxOnMap = (bbox4326: number[]) => {
  
   // ensure numeric values (sometimes they are strings)
   const nums = bbox4326.map(n => Number(n))
-
   if (
     nums.some(n => Number.isNaN(n)) ||
     (nums[0] === 0 && nums[1] === 0 && nums[2] === 0 && nums[3] === 0)
@@ -1214,7 +1216,7 @@ watch(
     // iterate inputs, find bbox entries where crs changed
     for (const [key, val] of Object.entries(newInputs)) {
       // Skip optional inputs that are not enabled
-      if (data.value?.inputs?.[key]?.minOccurs === 0 && !enabledInputs[key]) {
+     if (data.value?.inputs?.[key]?.minOccurs === 0 && !enabledInputs[key]) {
         continue
       }
       const old = oldInputs ? (oldInputs as any)[key] : undefined
@@ -1278,35 +1280,26 @@ watch(data, (val) => {
   }
 })
 
-
-
 async function cancelJob() {
   if (!jobId.value) return
-
   isCanceling.value = true
-
   try {
     const url = `${config.public.NUXT_ZOO_BASEURL}/ogc-api/jobs/${jobId.value}`
-
     await $fetch(url, {
       method: 'DELETE',
       headers: {
         Authorization: `Bearer ${authStore.token.access_token}`
       }
     })
-
     jobStatus.value = 'canceled'
     loading.value = false              
     submitting.value = false         
     jobId.value = null                 
-
     stopJobTracking()
-
     $q.notify({
       type: 'warning',
       message: 'Execution canceled'
     })
-
   } catch (err) {
     console.error(err)
     $q.notify({
@@ -1324,7 +1317,6 @@ function stopJobTracking() {
     ws = null
   }
 }
-
  
  
 </script>
@@ -1354,19 +1346,17 @@ function stopJobTracking() {
         <div class="text-subtitle1 text-grey-7">
           {{ data.description }}
         </div>
-        <q-card-section class="q-pa-md bg-grey-1 rounded-borders q-mt-md">
+        <q-card class="q-pa-md rounded-borders bg-grey-1">
 
-          <!-- Version -->
           <div class="row q-mb-sm">
-            <div class="col-3 text-grey-7 text-weight-bold">Software Version</div>
+            <div class="col-3 text-weight-bold text-grey-7">Software Version</div>
             <div class="col">
               {{ data.version || '—' }}
             </div>
           </div>
 
-          <!-- Keywords -->
           <div class="row q-mb-sm">
-            <div class="col-3 text-grey-7 text-weight-bold">Keywords</div>
+            <div class="col-3 text-weight-bold text-grey-7">Keywords</div>
             <div class="col">
               <span v-if="data.keywords?.length">
                 {{ data.keywords.join(', ') }}
@@ -1375,70 +1365,127 @@ function stopJobTracking() {
             </div>
           </div>
 
-              <!-- Metadata -->
-                <div class="row q-mb-sm">
-                  <div class="col-12 text-weight-bold q-mb-xs">Additional Metadata</div>
+          <q-expansion-item
+            expand-separator
+            icon="info"
+            label="Additional Metadata"
+            dense
+            dense-toggle
+            class="rounded-borders bg-white q-mt-md shadow-1"
+          >
+            <q-card-section>
 
-                  <div v-if="data.metadata?.length" class="col-12">
+              <div v-if="data.metadata?.length">
 
-                    <div
-                      v-for="(md, index) in data.metadata"
-                      :key="index"
-                      class="q-pa-sm bg-white rounded-borders q-mb-sm shadow-1"
-                    >
-                      <!-- Extract schema.org last part -->
-                      <template v-if="true">
-                        <div class="row items-start">
+                <div
+                  v-for="(md, i) in data.metadata"
+                  :key="i"
+                  class="q-py-sm q-mb-sm border-bottom"
+                  style="border-bottom: 1px solid #eee;"
+                >
 
-                          <!-- Icon + clickable schema link -->
-                          <a
-                            :href="md.role"
-                            target="_blank"
-                            class="q-mr-sm"
-                            style="text-decoration:none;"
-                          >
-                            <q-icon
-                              :name="iconMap[extractMetaType(md.role)] || 'info'"
-                              size="22px"
-                              class="text-primary"
-                            />
-                          </a>
+              <div class="row items-center q-mb-xs">
 
-                          <div>
-                            <div class="text-weight-bold">
-                              {{ extractMetaType(md.role) }}
-                            </div>
+                <!-- ICON (left side, decorative only) -->
+                <q-icon
+                  :name="iconMap[extractMetaType(md.role)] || 'info'"
+                  size="18px"
+                  class="text-primary q-mr-sm"
+                />
 
-                            <!-- CASE 1: Person object -->
-                            <div v-if="md.value && typeof md.value === 'object' && md.value['@type'] === 'Person'" class="q-mt-xs">
-                              <div><strong>Name:</strong> {{ md.value.name }}</div>
-                              <div v-if="md.value.email"><strong>Email:</strong> {{ md.value.email }}</div>
-                              <div v-if="md.value.affiliation"><strong>Affiliation:</strong> {{ md.value.affiliation }}</div>
-                            </div>
+                <!-- LABEL (clickable - schema.org page) -->
+                  <div
+                    class="text-weight-bold text-primary"
+                    :class="{ 'cursor-pointer': md.role }"
+                    @click="md.role && openSchema(md.role)"
+                  >
+                  {{ md.role ? extractMetaType(md.role) : md.title }}
+                </div>
 
-                            <!-- CASE 2: Normal text value -->
-                            <div v-else-if="md.title" class="text-grey-8">
-                              {{ md.title }}
-                            </div>
-                            <!-- CASE 3: Normal value -->
-                            <div v-else class="text-grey-8">
-                              {{ md.value }}
-                            </div>
-                            
-                          </div>
+              </div>
+                <!--title-only metadata -->
+                <div v-if="md.title && !md.value" class="q-mt-xs text-grey-8">
+                  {{ md.title }}
+                </div>
 
-                        </div>
-                      </template>
-
+                  <!--Person object -->
+                  <div
+                    v-if="md.value?.['@type'] === 'Person'"
+                    class="q-mt-xs text-grey-8"
+                  >
+                    <div><strong>Name:</strong> {{ md.value.name }}</div>
+                    <div v-if="md.value.email">
+                      <strong>Email:</strong>
+                      <a :href="'mailto:' + md.value.email" class="text-primary">{{ md.value.email }}</a>
+                    </div>
+                    <div v-if="md.value.affiliation">
+                      <strong>Affiliation:</strong> {{ md.value.affiliation }}
                     </div>
                   </div>
 
-                  <div v-else class="col-12">
-                  —
+                  <!-- Organization object -->
+                  <div
+                    v-else-if="md.value?.['@type'] === 'Organization'"
+                    class="q-mt-xs text-grey-8"
+                  >
+                    <div><strong>Name:</strong> {{ md.value.name }}</div>
+
+                    <div v-if="md.value.url">
+                      <strong>URL:</strong>
+                      <a :href="md.value.url" target="_blank" class="text-primary">
+                        {{ md.value.url }}
+                      </a>
+                    </div>
+
+                    <div v-if="md.value.address">
+                      <strong>Country:</strong>
+                      {{
+                        md.value.address.addressCountry ||
+                        md.value.address["s:addressCountry"] ||
+                        md.value.address.country ||
+                        '—'
+                      }}
+                    </div>
                   </div>
+
+                  <!-- Simple string value -->
+                  <div v-else-if="typeof md.value === 'string'" class="q-mt-xs text-grey-8">
+                    {{ md.value }}
+                  </div>
+
+                  <!-- Nested object -->
+                  <div v-else-if="typeof md.value === 'object'" class="q-mt-xs">
+                    <div
+                      v-for="(v, key) in md.value"
+                      :key="key"
+                      class="q-mb-xs text-grey-8"
+                    >
+                      <strong>{{ key }}:</strong>
+                      
+                      <!-- If URL inside nested value -->
+                      <template v-if="isUrl(v)">
+                        <a :href="v" target="_blank" class="text-primary">{{ v }}</a>
+                      </template>
+
+                      <template v-else>
+                        {{ v }}
+                      </template>
+                    </div>
+                  </div>
+
                 </div>
 
-        </q-card-section>
+              </div>
+
+              <div v-else class="text-grey-6">
+                —
+              </div>
+
+            </q-card-section>
+          </q-expansion-item>
+
+        </q-card>
+
         <q-separator class="q-mt-md" />
       </div>
  
@@ -1469,8 +1516,8 @@ function stopJobTracking() {
                 dense
               />
             </div>
-          <div v-if="enabledInputs[inputId] || input.minOccurs !== 0" :class="input.minOccurs === 0 ? 'q-pa-sm bg-grey-1 rounded-borders' : ''">
-            </div>
+          <div v-if="enabledInputs[inputId] || input.minOccurs !== 0"
+           :class="input.minOccurs === 0 ? 'q-pa-sm bg-grey-1 rounded-borders' : ''">
  
             <div class="q-gutter-sm">
               <q-badge color="grey-3" text-color="black" class="q-mb-sm">
@@ -1712,7 +1759,7 @@ function stopJobTracking() {
                 />
               </template>
             </div>
-          </div>  
+          </div>
           </q-card>
         </div>
  
@@ -1875,9 +1922,6 @@ function stopJobTracking() {
             :loading="loading || submitting"
             :disable="jobStatus === 'running' || jobStatus === 'submitted'"
           />
-          <q-btn label="Submit" type="submit" color="primary"  
-          :loading="loading || submitting"
-          :disable="loading || submitting" />
           <q-btn color="primary" outline label="Show JSON Preview" @click="showDialog = true" />
           <div v-if="jobStatus === 'running' || jobStatus === 'submitted'" class="q-mt-md">
             <q-btn
@@ -1887,7 +1931,7 @@ function stopJobTracking() {
               :loading="isCanceling"
               @click="cancelJob"
             />
-          </div>
+          </div> 
         </div>
       </q-form>
  
