@@ -21,7 +21,7 @@
 
         <div v-if="!authStore.user">
           <q-btn class="q-ml-sm" dense no-caps color="accent"
-                 :label="t('Authenticate')" href="/api/auth/signin"/>
+                 :label="t('Authenticate')" :href="`${baseURL}/api/auth/signin`"/>
         </div>
         <div v-else>
           <q-btn rounded dense flat>
@@ -100,8 +100,9 @@ const router = useRouter()
 const {signOut} = useAuth()
 
 const { landingLinks } = useLandingLinks()
-
-
+// Get baseURL from app config
+const { $config } = useNuxtApp()
+const baseURL = $config.app.baseURL || '/'
 
 const selfHref = computed(() => {
   const selfLink = landingLinks.value.find(link => link.rel === 'self')
@@ -116,7 +117,8 @@ function rewriteHref(href: string): string {
 
   if (relative === 'api') relative = 'swagger'
 
-  return `/${relative}` 
+  // Add baseURL prefix
+  return baseURL === '/' ? `/${relative}` : `${baseURL}/${relative}` 
 }
 
 // to generate labels
@@ -132,7 +134,7 @@ const homeTab = computed(() =>
   landingLinks.value
     .filter(link => link.href && link.href.endsWith('index.html'))
     .map(link => ({
-      path: '/', // always root for Home
+      path: baseURL === '/' ? '/' : baseURL, // use baseURL for Home
       label: 'Home'
     }))
 )
