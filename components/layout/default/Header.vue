@@ -33,9 +33,9 @@
           </div>
           <div v-if="!authStore.user">
             <q-btn v-if="isSmallScreen" class="q-px-sm" dense no-caps color="accent" round
-                   icon="mdi-account-circle" href="/api/auth/signin"/>
+                   icon="mdi-account-circle" :href="`${baseURL}/api/auth/signin`"/>
             <q-btn v-else-if="!isLoggedUser" class="q-px-md" no-caps color="accent" :label="t('Authenticate')"
-                   :href="'/api/auth/signin'"/>
+                   :href="`${baseURL}/api/auth/signin`"/>
           </div>
           <div v-else>
             <q-btn rounded dense flat>
@@ -106,6 +106,9 @@ const loggedUser = ref({email: 'mathereall@gmail.com'}) // TODO: Implement user 
 
 const authStore = useAuthStore()
 const { landingLinks } = useLandingLinks()
+// Get baseURL from app config
+const { $config } = useNuxtApp()
+const baseURL = $config.app.baseURL || '/'
 
 
 
@@ -138,7 +141,8 @@ function rewriteHref(href: string): string {
 
   if (relative === 'api') relative = 'swagger'
 
-  return `/${relative}` 
+  // Add baseURL prefix
+  return baseURL === '/' ? `/${relative}` : `${baseURL}/${relative}`
 }
 
 // helper to generate labels
@@ -154,7 +158,7 @@ const homeTab = computed(() =>
   landingLinks.value
     .filter(link => link.href && link.href.endsWith('index.html'))
     .map(link => ({
-      path: '/', // always root for Home
+      path: baseURL === '/' ? '/' : baseURL, // use baseURL for Home
       label: 'Home'
     }))
 )
