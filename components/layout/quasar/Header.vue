@@ -21,7 +21,7 @@
 
         <div v-if="!authStore.user">
           <q-btn class="q-ml-sm" dense no-caps color="accent"
-                 :label="t('Authenticate')" href="/api/auth/signin"/>
+                 :label="t('Authenticate')" :href="`${authBase}/api/auth/signin`"/>
         </div>
         <div v-else>
           <q-btn rounded dense flat>
@@ -37,7 +37,7 @@
               </q-item>
               <q-separator/>
               <q-item clickable v-close-popup @click="showLogoutDialog">
-                <q-item-section>{{ t('logout') }}</q-item-section>
+                <q-item-section>{{ t('Logout') }}</q-item-section>
               </q-item>
             </q-list>
           </q-menu>
@@ -100,8 +100,10 @@ const router = useRouter()
 const {signOut} = useAuth()
 
 const { landingLinks } = useLandingLinks()
-
-
+// Get baseURL from app config
+const { $config } = useNuxtApp()
+const baseURL = $config.app.baseURL || '/'
+const authBase = (config.public.AUTH_ORIGIN || '').replace(/\/$/, '') || ''
 
 const selfHref = computed(() => {
   const selfLink = landingLinks.value.find(link => link.rel === 'self')
@@ -116,7 +118,8 @@ function rewriteHref(href: string): string {
 
   if (relative === 'api') relative = 'swagger'
 
-  return `/${relative}` 
+  // Add baseURL prefix
+  return baseURL === '/' ? `/${relative}` : `${baseURL}/${relative}` 
 }
 
 // to generate labels
@@ -132,7 +135,7 @@ const homeTab = computed(() =>
   landingLinks.value
     .filter(link => link.href && link.href.endsWith('index.html'))
     .map(link => ({
-      path: '/', // always root for Home
+      path: baseURL === '/' ? '/' : baseURL, // use baseURL for Home
       label: 'Home'
     }))
 )
@@ -166,14 +169,14 @@ const isProcessing = ref(false)
 
 const showLogoutDialog = () => {
   $q.dialog({
-   title: t('logout'),
+   title: t('Logout'),
     message: t('Are you sure you want to logout?'),
     ok: {
-      label: t('ok'),
+      label: t('Ok'),
       color: 'primary'
     },
     cancel: {
-      label: t('cancel'),
+      label: t('Cancel'),
       color: 'negative'
     }
   }).onOk(() => {
@@ -184,40 +187,46 @@ const showLogoutDialog = () => {
 const handleLogout = async () => {
   isProcessing.value = true
   try {
-    await signOut({
-      redirect: false,
-    }).then(async (response) => {
-      console.log("response: ", response)
+    const callbackUrl = process.client
+      ? window.location.origin
+      : (authBase || baseURL || '/')
 
-      const token = authStore.token;
-      const logoutUrl = `${config.public.NUXT_OIDC_ISSUER}/protocol/openid-connect/logout`;
-
-      authStore.clearAuth()
-
-      const body = new URLSearchParams({
-          'id_token_hint': token.id_token,
-          'post_logout_redirect_uri': config.public.AUTH_ORIGIN,
-          'client_id': config.public.CLIENT_ID,
-        });
-      console.log("logoutUrl: ", logoutUrl)
-      console.log("body: ", body)
-      await fetch(`${logoutUrl}?${body.toString()}`, {
-        method: 'GET',
+    // 1) Invalidate NextAuth session + cookies (same origin)
+    try {
+      await fetch('/api/auth/signout', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-      }).then((response) => {
-        console.log("keycloak logout response: ", response);
-      });
+        body: new URLSearchParams({ callbackUrl }),
+        credentials: 'include',
+      })
+    } catch (e) {
+      console.warn('signout fetch failed', e)
+    }
+    await signOut({ redirect: false, callbackUrl })
 
-      // authStore.clearAuth()
-      // await router.push({path: '/'})
-    }).finally(() => {
-      isProcessing.value = false
-      router.push({path: '/'})
-    })
+    // 2) End Keycloak session via redirect (complete SSO logout)
+    const token = authStore.token
+    authStore.clearAuth()
+    
+    if (process.client && token?.id_token) {
+      const logoutUrl = `${config.public.NUXT_OIDC_ISSUER}/protocol/openid-connect/logout`
+      const params = new URLSearchParams({
+        id_token_hint: token.id_token,
+        post_logout_redirect_uri: callbackUrl,
+        client_id: config.public.NUXT_OIDC_CLIENT_ID,
+      })
+      // Redirect to Keycloak for complete SSO logout
+      window.location.href = `${logoutUrl}?${params.toString()}`
+    } else if (process.client) {
+      // Fallback: simple reload if no token
+      window.location.href = callbackUrl
+    }
   } catch (error) {
     console.error(error)
+  } finally {
+    isProcessing.value = false
   }
 }
 

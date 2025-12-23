@@ -70,6 +70,7 @@ export default NuxtAuthHandler({
             authorization: {
                 params: {
                     scope: 'openid profile email',
+                    prompt: 'login',
                 },
             },
             async profile(profile: any, token: any) {

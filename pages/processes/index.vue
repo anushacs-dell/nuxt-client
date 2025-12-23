@@ -17,8 +17,11 @@ const config = useRuntimeConfig()
 const data = ref<any>(null)
 const filter = ref('')
 const router = useRouter()
-const modalContent = ref('')
+const modalContent = ref<string | null>(null)
+const packageError = ref<string | null>(null)
 const showModal = ref(false)
+const selectedPackageProcessId = ref('')
+
 
 
 const helpVisible = ref(false)
@@ -47,28 +50,62 @@ const viewProcess = (row: any) => {
 
 // fetch package 
 const packageProcess = async (row: any) => {
+  selectedPackageProcessId.value = row.id //store Id for filename
+  modalContent.value = null
+  packageError.value = null
   try {
     const response = await fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/processes/${row.id}/package`, {
       method: 'GET',
       headers: {
         "Accept": "application/cwl+yaml",
-        'Authorization': `Bearer ${authStore.token.access_token}`,
+        'Authorization': `Bearer ${authStore.token?.access_token}`,
         'Accept-Language': locale.value
       }
     })
     if (response.ok) {
-      console.log('Application Package downloaded successfully')
       modalContent.value = await response.text()
-      showModal.value = true
+    } else if (response.status === 404) {
+      packageError.value = t(
+        'Application package is not available. It may have been removed after a service restart.'
+      )
     } else {
-      console.error('Error downloading Application Package')
-      showModal.value = false
+      packageError.value = t(
+        'Failed to load application package.'
+      )
     }
+
+    showModal.value = true
   } catch (error) {
     console.error('Application Package request failed', error)
-    showModal.value = false
+    packageError.value = t(
+      'Unable to reach the server to retrieve the application package.'
+    )
+    showModal.value = true
   }
 }
+
+const downloadCWL = () => {
+  if (!modalContent.value) return;
+
+  // Create a blob from the modal content
+  const blob = new Blob([modalContent.value], {
+    type: "text/yaml"
+  });
+
+  // Create a temporary download link
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+
+  // Use processId from packageProcess()
+  const filename = `${selectedPackageProcessId.value || 'application-package'}.cwl`
+
+  a.href = url;
+  a.download = filename
+  a.click();
+
+  // Clean up
+  URL.revokeObjectURL(url);
+};
 
 // load cwl-svg demo bundles  
 const loadSvgScripts = async () => {
@@ -115,7 +152,7 @@ const visualizeCwl = async (row: any) => {
     const metaRes = await fetch(metaUrl, {
       headers: {
         Accept: 'application/json',
-        Authorization: `Bearer ${authStore.token.access_token}`,
+        Authorization: `Bearer ${authStore.token?.access_token}`,
         'Accept-Language': locale.value
       }
     })
@@ -123,13 +160,11 @@ const visualizeCwl = async (row: any) => {
     selectedProcess.value = metaData
  
 
-
-
     const url = `${config.public.NUXT_ZOO_BASEURL}/ogc-api/processes/${row.id}/package`
     const res = await fetch(url, {
       headers: {
         Accept: 'application/cwl+yaml',
-        Authorization: `Bearer ${authStore.token.access_token}`,
+        Authorization: `Bearer ${authStore.token?.access_token}`,
         'Accept-Language': locale.value
       }
     })
@@ -150,6 +185,33 @@ const visualizeCwl = async (row: any) => {
     loadingCwl.value = false
   }
 }
+
+const iconMap: Record<string, string> = {
+  softwareVersion: "apps",
+  author: "person",
+  contributor: "group",
+  organization: "business",
+  license: "description",
+  keywords: "tag",
+  codeRepository: "cloud_upload",
+};
+
+// Convert URL - softwareVersion
+const extractMetaType = (role: string) => {
+  if (!role) return '';
+  return role.split("/").pop(); 
+};
+
+const isUrl = (value) => {
+  if (typeof value !== "string") return false;
+  return value.startsWith("http://") || value.startsWith("https://");
+};
+
+const openSchema = (url) => {
+  window.open(url, "_blank");
+};
+
+
 
 const onRowClick = async (evt, row, index) => {
   selectedProcess.value = row
@@ -272,7 +334,7 @@ const deleteProcess = async (row: any) => {
       const response = await fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/processes/${row.id}`, {
         method: 'DELETE',
         headers: { 
-          Authorization: `Bearer ${authStore.token.access_token}`,
+          Authorization: `Bearer ${authStore.token?.access_token}`,
           'Accept-Language': locale.value 
         }
       })
@@ -330,7 +392,7 @@ const submitForm = async () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/cwl+yaml',
-        'Authorization': `Bearer ${authStore.token.access_token}`,
+        'Authorization': `Bearer ${authStore.token?.access_token}`,
         'Accept-Language': locale.value
       },
       body: fileContent.value,
@@ -367,7 +429,7 @@ const fetchData = async () => {
   try {
     data.value = await $fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/processes`, {
       headers: {
-        Authorization: `Bearer ${authStore.token.access_token}`,
+        Authorization: `Bearer ${authStore.token?.access_token}`,
         'Accept-Language': locale.value
       }
     })
@@ -418,24 +480,23 @@ const onClearSearch = async () => {
   <q-page class="q-pa-sm">
     <div class="row justify-center">
       <div class="col-12 q-pa-md" style="max-width: 1080px;">
-<p class="text-h4 q-mb-md text-weight-bold">{{ t('Processes List') }}</p>
 
-<!-- Buttons Row -->
-<div class="row items-center q-mb-md">
+        <p class="text-h4 q-mb-md text-weight-bold">{{ t('Processes List') }}</p>
 
-  <!-- Help Button -->
-  <q-btn
-    flat
-    icon="help_outline"
-    color="primary"
-    :label="t('Help')"
-    @click="helpVisible = true"
-  />
+        <!-- Buttons row -->
+        <div class="row items-center q-mb-md">
+          <!-- Help Button -->
+          <q-btn
+            flat
+            icon="help_outline"
+            color="primary"
+            :label="t('Help')"
+            @click="helpVisible = true"
+          />
 
-  <q-space />
+          <q-space />
 
-  <!-- Add Process Button -->
-
+          <!-- Add Process Button -->
           <q-btn
             v-if="isConformToCwl === true"
             color="primary"
@@ -446,15 +507,8 @@ const onClearSearch = async () => {
           />
         </div>
 
-        <!-- Help Dialog -->
-        <HelpDialog
-          v-model="helpVisible"
-          title="Processes List Help"
-          :help-content="helpContent"
-        />
-
+        <HelpDialog v-model="helpVisible" title="Processes List Help" :help-content="helpContent" />
         <q-separator />
-
 
         <div class="q-mb-md">
           <q-input
@@ -483,7 +537,7 @@ const onClearSearch = async () => {
                 </q-td>
               </template>
             </q-table>
-            <!-- CWL Preview Section -->
+            <!-- CWL Preview Section (UNDER the table) -->
             <div v-if="selectedProcess" class="row q-col-gutter-lg q-mt-lg">
               <div class="col-8">
 
@@ -495,14 +549,8 @@ const onClearSearch = async () => {
               </div>
 
               
-               <div class="q-mt-md">
-                <p class="text-weight-bold">Additional Metadata</p>
-                <pre style="background:#f5f5f5; padding:6px; border-radius:4px; max-height:200px; overflow:auto;">
-                    {{ JSON.stringify(selectedProcess?.metadata, null, 2) }}
-                </pre>
               </div>
-              </div>
-              <!-- Right metadata -->
+              <!-- Right: metadata -->
               <div class="col-4 q-mt-xl">
                 <q-card flat bordered>
                   <q-card-section>
@@ -510,55 +558,196 @@ const onClearSearch = async () => {
                     <q-separator class="q-my-sm" />
 
                     <p><b>Description:</b> {{ selectedProcess?.description || '—' }}</p>
-                    <p><b>Version:</b> {{ selectedProcess?.version || '—' }}</p>
+                    
+                    <div class="row q-mb-sm items-center">
+                      <div class="text-weight-bold">Software Version:</div>
+                      <div class="q-ml-sm">{{ selectedProcess?.version || '—' }}</div>
+                    </div>
 
-                    <p><b>Keywords:</b></p>
-                    <ul v-if="selectedProcess?.keywords?.length">
-                      <li v-for="word in selectedProcess.keywords" :key="word">{{ word }}</li>
-                    </ul>
-                    <p v-else>—</p>
+
+                    <p><b>Keywords:</b>
+                      <span v-if="selectedProcess?.keywords?.length">
+                        {{ selectedProcess.keywords.join(', ') }}
+                      </span>
+                      <span v-else>—</span>
+                    </p>
+
 
                     <q-separator class="q-my-sm" />
 
                     <!-- Inputs Table -->
-                    <p class="text-weight-bold">Inputs</p>
-                    <q-table
-                      flat
-                      :rows="Object.entries(selectedProcess?.inputs || {}).map(([key, val]) => ({
-                        label: key,
-                        type: val?.schema?.type || val?.type || 'unknown',
-                        description: val?.description || '—'
-                      }))"
-                      :columns="[
-                        { name: 'label', label: 'Label', align: 'left', field: 'label' },
-                        { name: 'type', label: 'Type', align: 'left', field: 'type' },
-                        { name: 'description', label: 'Description', align: 'left', field: 'description' }
-                      ]"
-                      dense
-                      bordered
-                      no-data-label="No inputs"
-                    />
+                    <p class="text-weight-bold q-mt-md">Inputs</p>
+
+                    <table class="custom-table">
+                      <thead>
+                        <tr>
+                          <th>Label</th>
+                          <th>Type</th>
+                          <th>Description</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        <tr v-for="([key, val]) in Object.entries(selectedProcess?.inputs || {})" :key="key">
+                          <td>{{ key }}</td>
+                          <td>{{ val?.schema?.type || val?.type || 'unknown' }}</td>
+                          <td>{{ val?.description || '—' }}</td>
+                        </tr>
+
+                        <tr v-if="!Object.keys(selectedProcess?.inputs || {}).length">
+                          <td colspan="3" class="text-center text-grey">No inputs</td>
+                        </tr>
+                      </tbody>
+                    </table>
+
 
                     <q-separator class="q-my-sm" />
 
                     <!-- Outputs Table -->
-                    <p class="text-weight-bold">Outputs</p>
-                    <q-table
-                      flat
-                      :rows="Object.entries(selectedProcess?.outputs || {}).map(([key, val]) => ({
-                        label: key,
-                        type: val?.schema?.type || val?.type || 'unknown',
-                        description: val?.description || '—'
-                      }))"
-                      :columns="[
-                        { name: 'label', label: 'Label', align: 'left', field: 'label' },
-                        { name: 'type', label: 'Type', align: 'left', field: 'type' },
-                        { name: 'description', label: 'Description', align: 'left', field: 'description' }
-                      ]"
-                      dense
-                      bordered
-                      no-data-label="No outputs"
-                    />
+                    <p class="text-weight-bold q-mt-md">Outputs</p>
+
+                    <table class="custom-table">
+                      <thead>
+                        <tr>
+                          <th>Label</th>
+                          <th>Type</th>
+                          <th>Description</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        <tr v-for="([key, val]) in Object.entries(selectedProcess?.outputs || {})" :key="key">
+                          <td>{{ key }}</td>
+                          <td>{{ val?.schema?.type || val?.type || 'unknown' }}</td>
+                          <td>{{ val?.description || '—' }}</td>
+                        </tr>
+
+                        <tr v-if="!Object.keys(selectedProcess?.outputs || {}).length">
+                          <td colspan="3" class="text-center text-grey">No outputs</td>
+                        </tr>
+                      </tbody>
+                    </table>
+
+                <q-separator class="q-my-sm" />
+
+                <q-expansion-item
+                  expand-separator
+                  icon="info"
+                  label="Additional Metadata"
+                  dense
+                  dense-toggle
+                  class="rounded-borders bg-white q-mt-md shadow-1"
+                >
+                  <q-card-section>
+
+                    <div v-if="selectedProcess.metadata?.length">
+
+                      <div
+                        v-for="(md, i) in selectedProcess.metadata"
+                        :key="i"
+                        class="q-py-sm q-mb-sm border-bottom"
+                        style="border-bottom: 1px solid #eee;"
+                      >
+
+                    <div class="row items-center q-mb-xs">
+
+                      <!-- ICON (left side, decorative only) -->
+                      <q-icon
+                        :name="iconMap[extractMetaType(md.role)] || 'info'"
+                        size="18px"
+                        class="text-primary q-mr-sm"
+                      />
+
+                      <!-- LABEL (clickable - schema.org page) -->
+                        <div
+                          class="text-weight-bold text-primary"
+                          :class="{ 'cursor-pointer': md.role }"
+                          @click="md.role && openSchema(md.role)"
+                        >
+                        {{ md.role ? extractMetaType(md.role) : md.title }}
+                      </div>
+
+                    </div>
+                      <!--title-only metadata -->
+                      <div v-if="md.title && !md.value" class="q-mt-xs text-grey-8">
+                        {{ md.title }}
+                      </div>
+
+                        <!--Person object -->
+                        <div
+                          v-if="md.value?.['@type'] === 'Person'"
+                          class="q-mt-xs text-grey-8"
+                        >
+                          <div><strong>Name:</strong> {{ md.value.name }}</div>
+                          <div v-if="md.value.email">
+                            <strong>Email:</strong>
+                            <a :href="'mailto:' + md.value.email" class="text-primary">{{ md.value.email }}</a>
+                          </div>
+                          <div v-if="md.value.affiliation">
+                            <strong>Affiliation:</strong> {{ md.value.affiliation }}
+                          </div>
+                        </div>
+
+                        <!-- Organization object -->
+                        <div
+                          v-else-if="md.value?.['@type'] === 'Organization'"
+                          class="q-mt-xs text-grey-8"
+                        >
+                          <div><strong>Name:</strong> {{ md.value.name }}</div>
+
+                          <div v-if="md.value.url">
+                            <strong>URL:</strong>
+                            <a :href="md.value.url" target="_blank" class="text-primary">
+                              {{ md.value.url }}
+                            </a>
+                          </div>
+
+                          <div v-if="md.value.address">
+                            <strong>Country:</strong>
+                            {{
+                              md.value.address.addressCountry ||
+                              md.value.address["s:addressCountry"] ||
+                              md.value.address.country ||
+                              '—'
+                            }}
+                          </div>
+                        </div>
+
+                        <!-- Simple string value -->
+                        <div v-else-if="typeof md.value === 'string'" class="q-mt-xs text-grey-8 long-text">
+                          {{ md.value }}
+                        </div>
+
+                        <!-- Nested object -->
+                        <div v-else-if="typeof md.value === 'object'" class="q-mt-xs">
+                          <div
+                            v-for="(v, key) in md.value"
+                            :key="key"
+                            class="q-mb-xs text-grey-8"
+                          >
+                            <strong>{{ key }}:</strong>
+                            
+                            <!-- If URL inside nested value -->
+                            <template v-if="isUrl(v)">
+                              <a :href="v" target="_blank" class="text-primary long-text">{{ v }}</a>
+                            </template>
+
+                            <template v-else>
+                              <span class="long-text">{{ v }}</span>
+                            </template>
+                          </div>
+                        </div>
+
+                      </div>
+
+                    </div>
+
+                    <div v-else class="text-grey-6">
+                      —
+                    </div>
+
+                  </q-card-section>
+                </q-expansion-item>
 
                   </q-card-section>
                 </q-card>
@@ -616,8 +805,27 @@ const onClearSearch = async () => {
           <q-btn icon="close" flat round dense @click="showModal = false" />
         </q-card-section>
         <q-card-section>
-          <div v-if="modalContent"><pre style="max-width:100%;max-height:250px;overflow:auto;">{{ modalContent }}</pre></div>
-          <div v-else class="text-negative">No data or failed to fetch.</div>
+          <div v-if="modalContent">
+            <pre style="max-width:100%;max-height:250px;overflow:auto;">{{ modalContent }}</pre>
+            <div class="row justify-end">
+              <q-btn
+                color="primary"
+                label="Download CWL"
+                class="q-mt-md"
+                @click="downloadCWL"
+              />
+            </div>
+          </div>
+          <!-- ERROR -->
+          <div v-else-if="packageError" class="text-negative">
+            <q-icon name="warning" size="18px" class="q-mr-sm" />
+            {{ packageError }}
+          </div>
+
+          <!-- LOADING / EMPTY -->
+          <div v-else class="text-grey-6">
+            {{ t('Loading package information...') }}
+          </div>
         </q-card-section>
       </q-card>
     </q-dialog>
@@ -625,7 +833,36 @@ const onClearSearch = async () => {
 
   </q-page>
 </template>
-
 <style>
+.custom-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  background: white;
+  border-radius: 4px;
+  overflow: hidden;
+  font-size: 14px;
+}
 
+.custom-table th {
+  background: #f2f2f2;
+  padding: 8px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+  font-weight: bold;
+}
+
+.custom-table td {
+  padding: 8px;
+  border-bottom: 1px solid #eee;
+}
+
+.custom-table tr:last-child td {
+  border-bottom: none;
+}
+
+.long-text {
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
 </style>

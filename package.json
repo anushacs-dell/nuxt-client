@@ -27,6 +27,7 @@
         "js-yaml": "^4.1.1",
         "leaflet": "^1.9.4",
         "leaflet.pm": "^2.2.0",
+        "markdown-it": "^14.1.0",
         "nanoid": ">=5.0.9",
         "next-auth": "^4.21.1",
         "nuxt": "^3.15.4",

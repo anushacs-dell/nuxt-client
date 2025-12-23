@@ -169,10 +169,17 @@ watch(
 
 
 const fetchJobDetails = async () => {
+  const bearer = authStore.token?.access_token
+  if (!bearer) {
+    console.warn('No bearer token available; skipping job details fetch')
+    clearInterval(intervalId)
+    return
+  }
+
   try {
     const response = await $fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/jobs/${jobId}`, {
       headers: {
-        Authorization: `Bearer ${authStore.token.access_token}`,
+        Authorization: `Bearer ${bearer}`,
         'Accept-Language': locale.value
       },
     })
@@ -196,10 +203,17 @@ const linkOptions = computed(() => {
 })
 
 const fetchLinkContent = async (href: string) => {
+  const bearer = authStore.token?.access_token
+  if (!bearer) {
+    modalContent.value = 'Authentication required to fetch this content.'
+    showModal.value = true
+    return
+  }
+
   try {
     const response = await $fetch(href, {
       headers: {
-        Authorization: `Bearer ${authStore.token.access_token}`,
+        Authorization: `Bearer ${bearer}`,
         'Accept-Language': locale.value
       },
     })
