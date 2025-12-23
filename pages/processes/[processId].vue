@@ -134,7 +134,7 @@ const fetchData = async () => {
   try {
     data.value = await $fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/processes/${processId}`, {
       headers: {
-        Authorization: `Bearer ${authStore.token.access_token}`
+        Authorization: `Bearer ${authStore.token?.access_token}`
       }
     })
  
@@ -506,7 +506,7 @@ watch(
 const pollJobStatus = async (jobId: string) => {
   const jobUrl = `${config.public.NUXT_ZOO_BASEURL}/ogc-api/jobs/${jobId}`
   const headers = {
-    Authorization: `Bearer ${authStore.token.access_token}`
+    Authorization: `Bearer ${authStore.token?.access_token}`
   }
  
   while (true) {
@@ -640,7 +640,7 @@ const submitProcess = async () => {
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${authStore.token.access_token}`,
+          Authorization: `Bearer ${authStore.token?.access_token}`,
           "Content-Type": "application/json",
           Prefer: preferMode.value+(preferMode.value=="respond-async"?";return=representation":""),
         },
@@ -1288,7 +1288,7 @@ async function cancelJob() {
     await $fetch(url, {
       method: 'DELETE',
       headers: {
-        Authorization: `Bearer ${authStore.token.access_token}`
+        Authorization: `Bearer ${authStore.token?.access_token}`
       }
     })
     jobStatus.value = 'canceled'
