@@ -7,17 +7,19 @@ export default defineNuxtPlugin(async (nuxtApp) => {
         if (status.value === 'authenticated') {
             authStore.isAuthenticated = true;
 
-            const { data: token } = await useFetch('/api/token', { headers });
+            const { data: token, error } = await useFetch('/api/token', { headers });
 
-            if (token) {
-                authStore.setToken(token);
+            if (token.value) {
+                authStore.setToken(token.value);
                 authStore.setUser(data.value.user);
-                // console.log("token", token);
-            } else {
-                throw new Error('Failed to fetch token');
+            } else if (error.value) {
+                // Session invalide ou détruite, on ignore silencieusement
+                authStore.clearAuth();
             }
         }
     } catch (error) {
-        console.error('Error during authentication process:', error);
+        // Ignore les erreurs de session après logout
+        console.debug('Auth plugin: session unavailable', error);
+        authStore.clearAuth();
     }
 });
