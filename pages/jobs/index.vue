@@ -115,9 +115,11 @@ const helpContent = jobListHelp
 const fetchData = async () => {
   loading.value = true
   try {
+    const bearer = authStore.token?.access_token
+    if (!bearer) return
     const response = await $fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/jobs`, {
       headers: {
-        Authorization: `Bearer ${authStore.token.access_token}`,
+        Authorization: `Bearer ${bearer}`,
         'Accept-Language': locale.value
       }
     })
@@ -138,9 +140,11 @@ const fetchData = async () => {
 
 const fetchLinkContent = async (href: string) => {
   try {
+    const bearer = authStore.token?.access_token
+    if (!bearer) return
     const res = await $fetch(href, {
       headers: {
-        Authorization: `Bearer ${authStore.token.access_token}`,
+        Authorization: `Bearer ${bearer}`,
         'Accept-Language': locale.value
       }
     })
@@ -156,10 +160,12 @@ const fetchLinkContent = async (href: string) => {
 
 const deleteJob = async (row: any) => {
   try {
+    const bearer = authStore.token?.access_token
+    if (!bearer) return
     await $fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/jobs/${row.jobID}`, {
       method: 'DELETE',
       headers: {
-        Authorization: `Bearer ${authStore.token.access_token}`,
+        Authorization: `Bearer ${bearer}`,
         'Accept-Language': locale.value
       }
     })
