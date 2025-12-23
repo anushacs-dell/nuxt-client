@@ -23,10 +23,12 @@ const config = useRuntimeConfig()
 const data = ref(null)
 
 const fetchData = async () => {
+  const bearer = authStore.token?.access_token
+  if (!bearer) return
   try {
     data.value = await $fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/`, {
       headers: {
-        Authorization: `Bearer ${authStore.token.access_token}`
+        Authorization: `Bearer ${bearer}`
       }
     })
   } catch (error) {
