@@ -28,7 +28,7 @@
   </q-page>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRuntimeConfig } from '#imports'
 import { useAuthStore } from '~/stores/auth'
@@ -42,11 +42,15 @@ const { locale, t } = useI18n()
 
 onMounted(async () => {
   try {
+    const headers: Record<string, string> = {
+      'Accept-Language': locale.value
+    }
+    const bearer = authStore.token?.access_token
+    if (bearer) {
+      headers.Authorization = `Bearer ${bearer}`
+    }
     const response = await fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/conformance`, {
-      headers: {
-        Authorization: `Bearer ${authStore.token.access_token}`,
-        'Accept-Language': locale.value
-      }
+      headers
     })
     const data = await response.json()
     conformanceLinks.value = data.conformsTo || []

@@ -3,6 +3,7 @@ import {defineQuasarConfig} from './quasar.config'
 
 export default defineNuxtConfig({
     app: {
+        baseURL: process.env.NUXT_APP_BASE_URL || '/',
         head: {
             title: 'ZOO-Project Nuxt Client',
             meta: [

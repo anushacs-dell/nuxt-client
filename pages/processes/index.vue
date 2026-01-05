@@ -58,7 +58,7 @@ const packageProcess = async (row: any) => {
       method: 'GET',
       headers: {
         "Accept": "application/cwl+yaml",
-        'Authorization': `Bearer ${authStore.token.access_token}`,
+        'Authorization': `Bearer ${authStore.token?.access_token}`,
         'Accept-Language': locale.value
       }
     })
@@ -152,7 +152,7 @@ const visualizeCwl = async (row: any) => {
     const metaRes = await fetch(metaUrl, {
       headers: {
         Accept: 'application/json',
-        Authorization: `Bearer ${authStore.token.access_token}`,
+        Authorization: `Bearer ${authStore.token?.access_token}`,
         'Accept-Language': locale.value
       }
     })
@@ -164,7 +164,7 @@ const visualizeCwl = async (row: any) => {
     const res = await fetch(url, {
       headers: {
         Accept: 'application/cwl+yaml',
-        Authorization: `Bearer ${authStore.token.access_token}`,
+        Authorization: `Bearer ${authStore.token?.access_token}`,
         'Accept-Language': locale.value
       }
     })
@@ -334,7 +334,7 @@ const deleteProcess = async (row: any) => {
       const response = await fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/processes/${row.id}`, {
         method: 'DELETE',
         headers: { 
-          Authorization: `Bearer ${authStore.token.access_token}`,
+          Authorization: `Bearer ${authStore.token?.access_token}`,
           'Accept-Language': locale.value 
         }
       })
@@ -392,7 +392,7 @@ const submitForm = async () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/cwl+yaml',
-        'Authorization': `Bearer ${authStore.token.access_token}`,
+        'Authorization': `Bearer ${authStore.token?.access_token}`,
         'Accept-Language': locale.value
       },
       body: fileContent.value,
@@ -429,7 +429,7 @@ const fetchData = async () => {
   try {
     data.value = await $fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/processes`, {
       headers: {
-        Authorization: `Bearer ${authStore.token.access_token}`,
+        Authorization: `Bearer ${authStore.token?.access_token}`,
         'Accept-Language': locale.value
       }
     })
