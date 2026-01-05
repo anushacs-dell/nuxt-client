@@ -6,6 +6,8 @@ import { QCard, QCardSection, QInput, QBtn, QDialog, QForm, QUploader, QSpinnerG
 import HelpDialog from '../../components/help/HelpDialog.vue'
 import processListHelp from '../../components/help/processListHelp.js'
 
+import AppDialog from '~/components/modal/AppDialog.vue'
+
 import yaml from 'js-yaml'
 import { nextTick } from 'vue'
 
@@ -797,25 +799,13 @@ const onClearSearch = async () => {
     </q-dialog>
 
     <!-- Package Modal -->
-    <q-dialog v-model="showModal" persistent>
-      <q-card style="min-width:600px; max-width:90vw;" class="rounded-borders">
-        <q-card-section class="row items-center q-pb-none">
-          <div class="text-h6">Application Package</div>
-          <q-space />
-          <q-btn icon="close" flat round dense @click="showModal = false" />
-        </q-card-section>
-        <q-card-section>
-          <div v-if="modalContent">
-            <pre style="max-width:100%;max-height:250px;overflow:auto;">{{ modalContent }}</pre>
-            <div class="row justify-end">
-              <q-btn
-                color="primary"
-                label="Download CWL"
-                class="q-mt-md"
-                @click="downloadCWL"
-              />
-            </div>
-          </div>
+    <AppDialog
+      v-model="showModal"
+      title="Application Package"
+    >
+      <div v-if="modalContent">
+        <pre class="dialog-pre">{{ modalContent }}</pre>
+        </div>
           <!-- ERROR -->
           <div v-else-if="packageError" class="text-negative">
             <q-icon name="warning" size="18px" class="q-mr-sm" />
@@ -826,10 +816,16 @@ const onClearSearch = async () => {
           <div v-else class="text-grey-6">
             {{ t('Loading package information...') }}
           </div>
-        </q-card-section>
-      </q-card>
-    </q-dialog>
-
+        <template #footer>
+          <div class="row justify-end">
+            <q-btn
+              color="primary"
+              label="Download CWL"
+              @click="downloadCWL"
+            />
+          </div>
+        </template>
+      </AppDialog>
 
   </q-page>
 </template>
@@ -864,5 +860,11 @@ const onClearSearch = async () => {
 .long-text {
   word-break: break-all;
   overflow-wrap: anywhere;
+}
+
+.dialog-pre {
+  max-width: 100%;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 </style>
