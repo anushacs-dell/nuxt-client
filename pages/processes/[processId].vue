@@ -73,7 +73,7 @@ const getDefaultBbox = (schema: any) => {
 const subscriberValues = ref({
   successUri: `${config.public.SUBSCRIBERURL}?jobid=JOBSOCKET-${channelId.value}&type=success`,
   inProgressUri: `${config.public.SUBSCRIBERURL}?jobid=JOBSOCKET-${channelId.value}&type=inProgress`,
-  failedUri: `${config.public.SUBSCRIBERURL}jobid=JOBSOCKET-${channelId.value}&type=failed`
+  failedUri: `${config.public.SUBSCRIBERURL}?jobid=JOBSOCKET-${channelId.value}&type=failed`
 })
  
  
@@ -408,12 +408,12 @@ onMounted(async () => {
  
 const convertOutputsToPayload = (outputs: Record<string, any[]>) => {
   const result: Record<string, any> = {}
- 
+
   for (const [key, outputArray] of Object.entries(outputs)) {
     if (outputArray && outputArray.length > 0) {
       const outputConfig: any = {}
-     
-      // Parcourir chaque élément du tableau
+
+      // Iterate through each item in the array
       outputArray.forEach(item => {
         if (item.id === 'transmission') {
           outputConfig.transmissionMode = item.cval
@@ -423,7 +423,7 @@ const convertOutputsToPayload = (outputs: Record<string, any[]>) => {
           }
         }
       })
-     
+
       result[key] = outputConfig
     }
   }
@@ -615,14 +615,17 @@ const submitProcess = async () => {
  
     let wsUrl = "";
     if (typeof window !== "undefined") {
-      wsUrl = `ws://${window.location.hostname}:8888/`;
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      // Use wss or ws to access the WebSocket
+      const hostname = window.location.hostname.replace(/^webui\./, 'ws.');
+      wsUrl = `${protocol}//${hostname}/`;
     }
  
   // subscriber URLs for async only
   const subscribers = {
-    successUri: `http://zookernel/cgi-bin/publish.py?jobid=JOBSOCKET-${channelId.value}&type=success`,
-    inProgressUri: `http://zookernel/cgi-bin/publish.py?jobid=JOBSOCKET-${channelId.value}&type=inProgress`,
-    failedUri: `http://zookernel/cgi-bin/publish.py?jobid=JOBSOCKET-${channelId.value}&type=failed`,
+    successUri: `${config.public.SUBSCRIBERURL}?jobid=JOBSOCKET-${channelId.value}&type=success`,
+    inProgressUri: `${config.public.SUBSCRIBERURL}?jobid=JOBSOCKET-${channelId.value}&type=inProgress`,
+    failedUri: `${config.public.SUBSCRIBERURL}?jobid=JOBSOCKET-${channelId.value}&type=failed`,
   };
  
   try {
