@@ -801,7 +801,7 @@ const onClearSearch = async () => {
     <!-- Package Modal -->
     <AppDialog
       v-model="showModal"
-      title="Application Package"
+      :title="t('Application Package')"
     >
       <div v-if="modalContent">
         <pre class="dialog-pre">{{ modalContent }}</pre>
