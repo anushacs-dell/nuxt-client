@@ -901,7 +901,7 @@ const onClearSearch = async () => {
   max-width: 420px;
   line-height: 1.4;
 }
-</style>
+
 .dialog-pre {
   max-width: 100%;
   white-space: pre-wrap;
