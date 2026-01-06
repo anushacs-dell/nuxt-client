@@ -584,17 +584,22 @@ const pollJobStatus = async (jobId: string) => {
     try {
       const job = await $fetch(jobUrl, { headers })
       jobStatus.value = job.status
- 
-      if (job.status === 'successful') {
-        response.value = job
-        loading.value = false
-        break
-      } else if (job.status === 'failed') {
-        response.value = { error: 'Job failed', details: job }
+
+      // Stop polling when job is finished or canceled
+      if (['successful', 'failed', 'canceled'].includes(job.status)) {
+        if (job.status === 'successful') {
+          response.value = job
+        } else if (job.status === 'failed') {
+          response.value = { error: 'Job failed', details: job }
+        } else if (job.status === 'canceled') {
+          response.value = { info: 'Job was canceled', details: job }
+        }
+
         loading.value = false
         break
       }
- 
+
+      // Poll every 2 seconds
       await new Promise(resolve => setTimeout(resolve, 2000))
     } catch (err) {
       console.error('Polling error:', err)
@@ -666,10 +671,8 @@ function validateAndSubmit() {
  
  
 const submitProcess = async () => {
-  if (loading.value || submitting.value) {
-    return;
-  }
- 
+  if (loading.value || submitting.value) return;
+
   if (!validateRequiredInputs()) {
     $q.notify({
       type: "negative",
@@ -683,21 +686,24 @@ const submitProcess = async () => {
   jobStatus.value = "submitted";
   progressPercent.value = 0;
   progressMessage.value = "Submitting job...";
- 
-    let wsUrl = "";
-    if (typeof window !== "undefined") {
-      wsUrl = `ws://${window.location.hostname}:8888/`;
-    }
- 
+
+  let wsUrl = "";
+  if (typeof window !== "undefined") {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const hostname = window.location.hostname.replace(/^webui\./, "ws.");
+    wsUrl = `${protocol}//${hostname}/`;
+  }
+
   // subscriber URLs for async only
   const subscribers = {
-    successUri: `http://zookernel/cgi-bin/publish.py?jobid=JOBSOCKET-${channelId.value}&type=success`,
-    inProgressUri: `http://zookernel/cgi-bin/publish.py?jobid=JOBSOCKET-${channelId.value}&type=inProgress`,
-    failedUri: `http://zookernel/cgi-bin/publish.py?jobid=JOBSOCKET-${channelId.value}&type=failed`,
+    successUri: `${config.public.SUBSCRIBERURL}?jobid=JOBSOCKET-${channelId.value}&type=success`,
+    inProgressUri: `${config.public.SUBSCRIBERURL}?jobid=JOBSOCKET-${channelId.value}&type=inProgress`,
+    failedUri: `${config.public.SUBSCRIBERURL}?jobid=JOBSOCKET-${channelId.value}&type=failed`,
   };
- 
+
   try {
     const originalPayload = JSON.parse(jsonRequestPreview.value || "{}");
+
     if (preferMode.value === "respond-async") {
       originalPayload.executionOptions = originalPayload.executionOptions ?? {};
       originalPayload.executionOptions.subscriber = { ...subscribers };
@@ -713,7 +719,9 @@ const submitProcess = async () => {
         headers: {
           Authorization: `Bearer ${authStore.token?.access_token}`,
           "Content-Type": "application/json",
-          Prefer: preferMode.value+(preferMode.value=="respond-async"?";return=representation":""),
+          Prefer:
+            preferMode.value +
+            (preferMode.value == "respond-async" ? ";return=representation" : ""),
         },
         body: JSON.stringify(originalPayload),
       }
@@ -721,17 +729,21 @@ const submitProcess = async () => {
  
    
     if (preferMode.value === "respond-async") {
-      //  Async execution (requires jobID + websocket updates)
       if (!res || !res.jobID) {
         throw new Error("Expected async response with jobID, but got none");
       }
  
       jobId.value = res.jobID;
-      console.log(" Job submitted (server jobID):", res.jobID);
- 
+      console.log("Job submitted (server jobID):", res.jobID);
+
+      // Start polling in parallel to WS
+      pollJobStatus(res.jobID);
+
+      // WebSocket connection (optional real-time updates)
       ws = new WebSocket(wsUrl);
+
       ws.onopen = () => {
-        console.log(" WebSocket connected — subscribing to", "JOBSOCKET-" + channelId.value);
+        console.log("WebSocket connected — subscribing to", "JOBSOCKET-" + channelId.value);
         ws.send("SUB JOBSOCKET-" + channelId.value);
       };
  
@@ -744,20 +756,21 @@ const submitProcess = async () => {
           const msgId = msg.id ?? null;
  
           if (msgJobId !== "JOBSOCKET-" + channelId.value && msgId !== jobId.value) {
-            if(event.data!="1"){
+            if (event.data != "1") {
               progressPercent.value = 100;
               progressMessage.value = "Completed successfully";
               response.value = JSON.parse(event.data);
               loading.value = false;
               ws?.close();
-            }else
+            } else {
               console.log("Ignored WS message, not for this job:", msgJobId, msgId);
+            }
             return;
           }
 
-          if (jobStatus.value === 'canceled') {
-            loading.value = false
-            ws?.close()
+          if (jobStatus.value === "canceled") {
+            loading.value = false;
+            ws?.close();
           }
  
           // handle progress
@@ -782,7 +795,7 @@ const submitProcess = async () => {
             jobStatus.value = "running...";
           }
         } catch (e) {
-          console.error(" Invalid WS message:", event.data, e);
+          console.error("Invalid WS message:", event.data, e);
         }
       };
  
@@ -792,17 +805,15 @@ const submitProcess = async () => {
       };
  
     } else {
-      //  Sync execution (result returned immediately)
-      console.log(" Sync execution result:", res);
- 
-      //  Check if error response
+      // Sync execution
+      console.log("Sync execution result:", res);
+
       if (res.error) {
-        console.error(" Sync execution error:", res.error);
+        console.error("Sync execution error:", res.error);
         progressMessage.value = res.error.description || "Execution failed";
         jobStatus.value = "failed";
         response.value = res;
       } else {
-        // No status - treat as successful raw result
         progressPercent.value = 100;
         progressMessage.value = "Completed successfully (sync)";
         jobStatus.value = "successful";
@@ -821,6 +832,7 @@ const submitProcess = async () => {
     submitting.value = false;
   }
 };
+
  
  
  
@@ -1351,7 +1363,45 @@ watch(data, (val) => {
   }
 })
 
+// Cancel job while it is running or submitted
 async function cancelJob() {
+  if (!jobId.value) return
+
+  isCanceling.value = true
+
+  try {
+    const url = `${config.public.NUXT_ZOO_BASEURL}/ogc-api/jobs/${jobId.value}`
+    
+    await $fetch(url, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${authStore.token?.access_token}`
+      }
+    })
+
+    jobStatus.value = 'canceled' 
+    loading.value = false
+    submitting.value = false
+
+    stopJobTracking()              
+    $q.notify({
+      type: 'positive',
+      message: 'Execution canceled'
+    })
+
+    // DO NOT null jobId.value here so user can still delete the job if needed
+  } catch (err) {
+    console.error(err)
+    $q.notify({
+      type: 'negative',
+      message: 'Failed to cancel job'
+    })
+  } finally {
+    isCanceling.value = false
+  }
+}
+
+const deleteJob = async () => {
   if (!jobId.value) return
   isCanceling.value = true
   try {
@@ -1362,21 +1412,13 @@ async function cancelJob() {
         Authorization: `Bearer ${authStore.token?.access_token}`
       }
     })
-    jobStatus.value = 'canceled'
-    loading.value = false              
-    submitting.value = false         
-    jobId.value = null                 
-    stopJobTracking()
-    $q.notify({
-      type: 'warning',
-      message: 'Execution canceled'
-    })
+    jobStatus.value = ''
+    response.value = null
+    jobId.value = null
+    $q.notify({ type: 'positive', message: 'Job deleted successfully' })
   } catch (err) {
     console.error(err)
-    $q.notify({
-      type: 'negative',
-      message: 'Failed to cancel job'
-    })
+    $q.notify({ type: 'negative', message: 'Delete Failed' })
   } finally {
     isCanceling.value = false
   }
@@ -2001,13 +2043,32 @@ function stopJobTracking() {
             :disable="jobStatus === 'running' || jobStatus === 'submitted'"
           />
           <q-btn color="primary" outline label="Show JSON Preview" @click="showDialog = true" />
-          <div v-if="jobStatus === 'running' || jobStatus === 'submitted'" class="q-mt-md">
+          <!-- Cancel while job is running / submitted -->
+          <div
+            v-if="jobStatus === 'submitted' || jobStatus === 'running'"
+            class="q-mt-md"
+          >
             <q-btn
-              label="Cancel"
               color="negative"
               icon="cancel"
               :loading="isCanceling"
               @click="cancelJob"
+              :label="isCanceling ? 'Canceling…' : 'Cancel Job'"
+            />
+          </div>
+
+          <!-- Delete after job finished -->
+          <div
+            v-else-if="jobStatus === 'successful' || jobStatus === 'failed'"
+            class="q-mt-md"
+          >
+            <q-btn
+              color="negative"
+              outline
+              icon="delete"
+              :loading="isCanceling"
+              @click="deleteJob"
+              :label="isCanceling ? 'Deleting…' : 'Delete Job'"
             />
           </div> 
         </div>
