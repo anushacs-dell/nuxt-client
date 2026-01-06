@@ -1336,7 +1336,7 @@ function stopJobTracking() {
       flat
       icon="help_outline"
       color="primary"
-      label="Help"
+      :label="t('Help')"
       @click="helpVisible = true"
       class="q-mb-md"
     />
@@ -1358,14 +1358,14 @@ function stopJobTracking() {
         <q-card class="q-pa-md rounded-borders bg-grey-1">
 
           <div class="row q-mb-sm">
-            <div class="col-3 text-weight-bold text-grey-7">Software Version</div>
+            <div class="col-3 text-weight-bold text-grey-7">{{ t('Software Version') }}</div>
             <div class="col">
               {{ data.version || '—' }}
             </div>
           </div>
 
           <div class="row q-mb-sm">
-            <div class="col-3 text-weight-bold text-grey-7">Keywords</div>
+            <div class="col-3 text-weight-bold text-grey-7">{{ t('Keywords') }}</div>
             <div class="col">
               <span v-if="data.keywords?.length">
                 {{ data.keywords.join(', ') }}
@@ -1377,7 +1377,7 @@ function stopJobTracking() {
           <q-expansion-item
             expand-separator
             icon="info"
-            label="Additional Metadata"
+            :label="t('Additional Metadata')"
             dense
             dense-toggle
             class="rounded-borders bg-white q-mt-md shadow-1"
@@ -1504,7 +1504,7 @@ function stopJobTracking() {
  
         <div class="q-mb-lg">
           <div class="text-h4 text-weight-bold text-primary q-mb-sm">
-            Inputs
+            {{ t('Inputs') }}
           </div>
           <q-separator class="q-mt-md" />
         </div>
@@ -1799,7 +1799,7 @@ function stopJobTracking() {
  
         <div class="q-mb-lg">
           <div class="text-h4 text-weight-bold text-primary q-mb-sm">
-            Outputs
+            {{ t('Outputs') }}
           </div>
           <q-separator class="q-mt-md" />
         </div>

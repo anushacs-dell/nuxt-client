@@ -543,7 +543,7 @@ const onClearSearch = async () => {
             <div v-if="selectedProcess" class="row q-col-gutter-lg q-mt-lg">
               <div class="col-8">
 
-              <h5 class="text-weight-bold">CWL Preview</h5>
+              <h5 class="text-weight-bold">{{ t('CWL Preview') }}</h5>
 
               <div id="svg-container"
                   style="width: 100%; height: 600px; overflow: auto; border: 1px solid #ddd;">
@@ -556,18 +556,18 @@ const onClearSearch = async () => {
               <div class="col-4 q-mt-xl">
                 <q-card flat bordered>
                   <q-card-section>
-                    <p class="text-h6 text-weight-bold">Metadata</p>
+                    <p class="text-h6 text-weight-bold">{{ t('Metadata') }}</p>
                     <q-separator class="q-my-sm" />
 
-                    <p><b>Description:</b> {{ selectedProcess?.description || '—' }}</p>
+                    <p><b>Description</b> {{ selectedProcess?.description || '—' }}</p>
                     
                     <div class="row q-mb-sm items-center">
-                      <div class="text-weight-bold">Software Version:</div>
+                      <div class="text-weight-bold">{{ t('Software Version') }}</div>
                       <div class="q-ml-sm">{{ selectedProcess?.version || '—' }}</div>
                     </div>
 
 
-                    <p><b>Keywords:</b>
+                    <p><b>{{ t('Keywords') }}</b>
                       <span v-if="selectedProcess?.keywords?.length">
                         {{ selectedProcess.keywords.join(', ') }}
                       </span>
@@ -578,7 +578,7 @@ const onClearSearch = async () => {
                     <q-separator class="q-my-sm" />
 
                     <!-- Inputs Table -->
-                    <p class="text-weight-bold q-mt-md">Inputs</p>
+                    <p class="text-weight-bold q-mt-md">{{ t('Inputs') }}</p>
 
                     <table class="custom-table">
                       <thead>
@@ -606,7 +606,7 @@ const onClearSearch = async () => {
                     <q-separator class="q-my-sm" />
 
                     <!-- Outputs Table -->
-                    <p class="text-weight-bold q-mt-md">Outputs</p>
+                    <p class="text-weight-bold q-mt-md">{{ t('Outputs') }}</p>
 
                     <table class="custom-table">
                       <thead>
@@ -635,7 +635,7 @@ const onClearSearch = async () => {
                 <q-expansion-item
                   expand-separator
                   icon="info"
-                  label="Additional Metadata"
+                  :label="t('Additional Metadata')"
                   dense
                   dense-toggle
                   class="rounded-borders bg-white q-mt-md shadow-1"
@@ -820,7 +820,7 @@ const onClearSearch = async () => {
           <div class="row justify-end">
             <q-btn
               color="primary"
-              label="Download CWL"
+              :label="t('Download CWL')"
               @click="downloadCWL"
             />
           </div>
