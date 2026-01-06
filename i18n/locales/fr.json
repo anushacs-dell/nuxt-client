@@ -48,8 +48,15 @@
   "Cancel": "Annuler",
   "Application Package": "Paquet d'application",
   "No data or failed to fetch.": "Pas de données ou échec de la récupération.",
+  "Download CWL": "Télécharger le CWL",
+  "CWL Preview": "Aperçu CWL",
+  "Metadata": "Métadonnées",
+  "Software Version": "Version du logiciel",
+  "Additional Metadata": "Métadonnées Supplémentaires",
+ 
 
   "Inputs": "Entrées",
+  "Outputs": "Sorties",
   "Show JSON Preview": "Afficher l'aperçu JSON",
   "Status": "Statut",
   "Execute Request Confirmation": "Confirmation de la requête d'exécution",

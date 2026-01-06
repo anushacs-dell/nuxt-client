@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useHead } from '#imports'
 import { ref, onMounted, watch, reactive, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { useRuntimeConfig } from '#imports'
 import { triggerRef } from 'vue'
@@ -15,6 +16,7 @@ const {
 } = useRoute()
  
 const authStore = useAuthStore()
+const { locale, t } = useI18n()
 const config = useRuntimeConfig()
  
 const data = ref(null)
@@ -134,7 +136,8 @@ const fetchData = async () => {
   try {
     data.value = await $fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/processes/${processId}`, {
       headers: {
-        Authorization: `Bearer ${authStore.token?.access_token}`
+        Authorization: `Bearer ${authStore.token?.access_token}`,
+        'Accept-Language': locale.value
       }
     })
  
@@ -506,7 +509,8 @@ watch(
 const pollJobStatus = async (jobId: string) => {
   const jobUrl = `${config.public.NUXT_ZOO_BASEURL}/ogc-api/jobs/${jobId}`
   const headers = {
-    Authorization: `Bearer ${authStore.token?.access_token}`
+    Authorization: `Bearer ${authStore.token?.access_token}`,
+    'Accept-Language': locale.value
   }
  
   while (true) {
@@ -645,6 +649,7 @@ const submitProcess = async () => {
         headers: {
           Authorization: `Bearer ${authStore.token?.access_token}`,
           "Content-Type": "application/json",
+          'Accept-Language': locale.value,
           Prefer: preferMode.value+(preferMode.value=="respond-async"?";return=representation":""),
         },
         body: JSON.stringify(originalPayload),
@@ -1291,7 +1296,8 @@ async function cancelJob() {
     await $fetch(url, {
       method: 'DELETE',
       headers: {
-        Authorization: `Bearer ${authStore.token?.access_token}`
+        Authorization: `Bearer ${authStore.token?.access_token}`,
+        'Accept-Language': locale.value
       }
     })
     jobStatus.value = 'canceled'
@@ -1330,7 +1336,7 @@ function stopJobTracking() {
       flat
       icon="help_outline"
       color="primary"
-      label="Help"
+      :label="t('Help')"
       @click="helpVisible = true"
       class="q-mb-md"
     />
@@ -1352,14 +1358,14 @@ function stopJobTracking() {
         <q-card class="q-pa-md rounded-borders bg-grey-1">
 
           <div class="row q-mb-sm">
-            <div class="col-3 text-weight-bold text-grey-7">Software Version</div>
+            <div class="col-3 text-weight-bold text-grey-7">{{ t('Software Version') }}</div>
             <div class="col">
               {{ data.version || '—' }}
             </div>
           </div>
 
           <div class="row q-mb-sm">
-            <div class="col-3 text-weight-bold text-grey-7">Keywords</div>
+            <div class="col-3 text-weight-bold text-grey-7">{{ t('Keywords') }}</div>
             <div class="col">
               <span v-if="data.keywords?.length">
                 {{ data.keywords.join(', ') }}
@@ -1371,7 +1377,7 @@ function stopJobTracking() {
           <q-expansion-item
             expand-separator
             icon="info"
-            label="Additional Metadata"
+            :label="t('Additional Metadata')"
             dense
             dense-toggle
             class="rounded-borders bg-white q-mt-md shadow-1"
@@ -1498,7 +1504,7 @@ function stopJobTracking() {
  
         <div class="q-mb-lg">
           <div class="text-h4 text-weight-bold text-primary q-mb-sm">
-            Inputs
+            {{ t('Inputs') }}
           </div>
           <q-separator class="q-mt-md" />
         </div>
@@ -1793,7 +1799,7 @@ function stopJobTracking() {
  
         <div class="q-mb-lg">
           <div class="text-h4 text-weight-bold text-primary q-mb-sm">
-            Outputs
+            {{ t('Outputs') }}
           </div>
           <q-separator class="q-mt-md" />
         </div>
