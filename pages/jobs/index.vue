@@ -69,22 +69,17 @@
           </q-table>
         </q-card>
 
-        <q-dialog v-model="showModal" persistent>
-          <q-card style="min-width: 600px; max-width: 90vw;" class="rounded-borders">
-            <q-card-section class="row items-center q-pb-none">
-              <div class="text-h6">{{ t('Link Content') }}</div>
-              <q-space />
-              <q-btn icon="close" flat round dense @click="showModal = false" />
-            </q-card-section>
-
-            <q-card-section>
-              <div v-if="modalContent">
-                <pre>{{ modalContent }}</pre>
-              </div>
-              <div v-else class="text-negative">{{ t('No data or failed to fetch') }}</div>
-            </q-card-section>
-          </q-card>
-        </q-dialog>
+        <AppDialog
+          v-model="showModal"
+          :title="t('Link Content')"
+        >
+          <div v-if="modalContent">
+            <pre class="pre-content">{{ modalContent }}</pre>
+          </div>
+          <div v-else class="text-negative">
+            {{ t('No data or failed to fetch') }}
+          </div>
+        </AppDialog>
       </div>
     </div>
   </q-page>
@@ -101,6 +96,8 @@ import { Notify } from 'quasar'
 // Import Help components
 import HelpDialog from '../../components/help/HelpDialog.vue'
 import jobListHelp from '../../components/help/jobListHelp.js'
+
+import AppDialog from '~/components/modal/AppDialog.vue'
 
 const config = useRuntimeConfig()
 const authStore = useAuthStore()
@@ -226,3 +223,10 @@ const columns = computed(() => [
 ])
 
 </script>
+
+<style>
+.pre-content {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+</style>

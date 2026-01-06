@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useHead } from '#imports'
 import { ref, onMounted, watch, reactive, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { useRuntimeConfig } from '#imports'
 import { triggerRef } from 'vue'
@@ -15,6 +16,7 @@ const {
 } = useRoute()
  
 const authStore = useAuthStore()
+const { locale, t } = useI18n()
 const config = useRuntimeConfig()
  
 const data = ref(null)
@@ -73,7 +75,7 @@ const getDefaultBbox = (schema: any) => {
 const subscriberValues = ref({
   successUri: `${config.public.SUBSCRIBERURL}?jobid=JOBSOCKET-${channelId.value}&type=success`,
   inProgressUri: `${config.public.SUBSCRIBERURL}?jobid=JOBSOCKET-${channelId.value}&type=inProgress`,
-  failedUri: `${config.public.SUBSCRIBERURL}jobid=JOBSOCKET-${channelId.value}&type=failed`
+  failedUri: `${config.public.SUBSCRIBERURL}?jobid=JOBSOCKET-${channelId.value}&type=failed`
 })
  
  
@@ -205,7 +207,8 @@ const fetchData = async () => {
   try {
     data.value = await $fetch(`${config.public.NUXT_ZOO_BASEURL}/ogc-api/processes/${processId}`, {
       headers: {
-        Authorization: `Bearer ${authStore.token?.access_token}`
+        Authorization: `Bearer ${authStore.token?.access_token}`,
+        'Accept-Language': locale.value
       }
     })
  
@@ -479,12 +482,12 @@ onMounted(async () => {
  
 const convertOutputsToPayload = (outputs: Record<string, any[]>) => {
   const result: Record<string, any> = {}
- 
+
   for (const [key, outputArray] of Object.entries(outputs)) {
     if (outputArray && outputArray.length > 0) {
       const outputConfig: any = {}
-     
-      // Parcourir chaque élément du tableau
+
+      // Iterate through each item in the array
       outputArray.forEach(item => {
         if (item.id === 'transmission') {
           outputConfig.transmissionMode = item.cval
@@ -494,7 +497,7 @@ const convertOutputsToPayload = (outputs: Record<string, any[]>) => {
           }
         }
       })
-     
+
       result[key] = outputConfig
     }
   }
@@ -577,7 +580,8 @@ watch(
 const pollJobStatus = async (jobId: string) => {
   const jobUrl = `${config.public.NUXT_ZOO_BASEURL}/ogc-api/jobs/${jobId}`
   const headers = {
-    Authorization: `Bearer ${authStore.token?.access_token}`
+    Authorization: `Bearer ${authStore.token?.access_token}`,
+    'Accept-Language': locale.value
   }
  
   while (true) {
@@ -686,14 +690,17 @@ const submitProcess = async () => {
  
     let wsUrl = "";
     if (typeof window !== "undefined") {
-      wsUrl = `ws://${window.location.hostname}:8888/`;
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      // Use wss or ws to access the WebSocket
+      const hostname = window.location.hostname.replace(/^webui\./, 'ws.');
+      wsUrl = `${protocol}//${hostname}/`;
     }
  
   // subscriber URLs for async only
   const subscribers = {
-    successUri: `http://zookernel/cgi-bin/publish.py?jobid=JOBSOCKET-${channelId.value}&type=success`,
-    inProgressUri: `http://zookernel/cgi-bin/publish.py?jobid=JOBSOCKET-${channelId.value}&type=inProgress`,
-    failedUri: `http://zookernel/cgi-bin/publish.py?jobid=JOBSOCKET-${channelId.value}&type=failed`,
+    successUri: `${config.public.SUBSCRIBERURL}?jobid=JOBSOCKET-${channelId.value}&type=success`,
+    inProgressUri: `${config.public.SUBSCRIBERURL}?jobid=JOBSOCKET-${channelId.value}&type=inProgress`,
+    failedUri: `${config.public.SUBSCRIBERURL}?jobid=JOBSOCKET-${channelId.value}&type=failed`,
   };
  
   try {
@@ -713,6 +720,7 @@ const submitProcess = async () => {
         headers: {
           Authorization: `Bearer ${authStore.token?.access_token}`,
           "Content-Type": "application/json",
+          'Accept-Language': locale.value,
           Prefer: preferMode.value+(preferMode.value=="respond-async"?";return=representation":""),
         },
         body: JSON.stringify(originalPayload),
@@ -1359,7 +1367,8 @@ async function cancelJob() {
     await $fetch(url, {
       method: 'DELETE',
       headers: {
-        Authorization: `Bearer ${authStore.token?.access_token}`
+        Authorization: `Bearer ${authStore.token?.access_token}`,
+        'Accept-Language': locale.value
       }
     })
     jobStatus.value = 'canceled'
@@ -1398,7 +1407,7 @@ function stopJobTracking() {
       flat
       icon="help_outline"
       color="primary"
-      label="Help"
+      :label="t('Help')"
       @click="helpVisible = true"
       class="q-mb-md"
     />
@@ -1427,14 +1436,14 @@ function stopJobTracking() {
         <q-card class="q-pa-md rounded-borders bg-grey-1">
 
           <div class="row q-mb-sm">
-            <div class="col-3 text-weight-bold text-grey-7">Software Version</div>
+            <div class="col-3 text-weight-bold text-grey-7">{{ t('Software Version') }}</div>
             <div class="col">
               {{ data.version || '—' }}
             </div>
           </div>
 
           <div class="row q-mb-sm">
-            <div class="col-3 text-weight-bold text-grey-7">Keywords</div>
+            <div class="col-3 text-weight-bold text-grey-7">{{ t('Keywords') }}</div>
             <div class="col">
               <span v-if="data.keywords?.length">
                 {{ data.keywords.join(', ') }}
@@ -1446,7 +1455,7 @@ function stopJobTracking() {
           <q-expansion-item
             expand-separator
             icon="info"
-            label="Additional Metadata"
+            :label="t('Additional Metadata')"
             dense
             dense-toggle
             class="rounded-borders bg-white q-mt-md shadow-1"
@@ -1573,7 +1582,7 @@ function stopJobTracking() {
  
         <div class="q-mb-lg">
           <div class="text-h4 text-weight-bold text-primary q-mb-sm">
-            Inputs
+            {{ t('Inputs') }}
           </div>
           <q-separator class="q-mt-md" />
         </div>
@@ -1868,7 +1877,7 @@ function stopJobTracking() {
  
         <div class="q-mb-lg">
           <div class="text-h4 text-weight-bold text-primary q-mb-sm">
-            Outputs
+            {{ t('Outputs') }}
           </div>
           <q-separator class="q-mt-md" />
         </div>
