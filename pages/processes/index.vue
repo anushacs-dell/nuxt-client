@@ -521,7 +521,18 @@ const onClearSearch = async () => {
           />
         </div>
 
-        <HelpDialog v-model="helpVisible" title="Processes List Help" :help-content="helpContent" />
+        <HelpDialog
+          v-model="helpVisible"
+          :title="t('Processes List Help')"
+        >
+          <div
+            v-if="helpContent"
+            v-html="helpContent"
+          />
+          <div v-else class="text-negative">
+            {{ t('No data or failed to fetch') }}
+          </div>
+        </HelpDialog>
         <q-separator />
 
         <div class="q-mb-md">

@@ -211,7 +211,6 @@ const fetchData = async () => {
  
     if (data.value && data.value.inputs) {
       for (const [key, input] of Object.entries(data.value.inputs)) {
-        input.schema = normalizeBboxSchema(input.schema)
         if (input.minOccurs !== 0) {
           requiredInputs.value.push(key)
         }
@@ -1403,11 +1402,18 @@ function stopJobTracking() {
       @click="helpVisible = true"
       class="q-mb-md"
     />
-   
     <HelpDialog
       v-model="helpVisible"
-      :help-content="helpContent"
-    />
+      :title="t('Processes Help')"
+    >
+      <div
+        v-if="helpContent"
+        v-html="helpContent"
+      />
+      <div v-else class="text-negative">
+        {{ t('No data or failed to fetch') }}
+      </div>
+    </HelpDialog>
   <q-page class="q-pa-md">
     <div v-if="data">
    

@@ -1,48 +1,74 @@
 export default `
   <style>
     .help-container {
-      font-family: 'Segoe UI', sans-serif;
+      font-family: inherit;
       color: #333;
       line-height: 1.6;
-      padding: 10px;
     }
     .help-title {
-      font-size: 24px;
-      font-weight: bold;
+      font-size: 20px;
+      font-weight: 600;
       color: #2c3e50;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
       text-align: center;
     }
+    .help-intro {
+      font-size: 14px;
+      text-align: center;
+      margin-bottom: 14px;
+      color: #555;
+    }
     .help-section {
-      margin-bottom: 18px;
-      padding: 10px;
+      margin-bottom: 14px;
+      padding: 10px 12px;
       border-left: 4px solid #663e05;
       background: #f8f9fa;
       border-radius: 6px;
     }
     .help-section h5 {
-      font-size: 18px;
-      margin-bottom: 6px;
+      font-size: 16px;
+      margin: 0 0 6px;
       color: #2980b9;
+      font-weight: 600;
     }
-    .help-section p, .help-section ul {
-      margin: 5px 0;
-      padding-left: 15px;
+    .help-section p {
+      margin: 4px 0 6px;
+      font-size: 14px;
+    }
+
+    .help-section ul {
+      margin: 0;
+      padding-left: 0;
+      font-size: 14px;
     }
     .help-section ul li {
       list-style: none;
-      margin: 5px 0;
+      margin: 6px 0;
       position: relative;
-      padding-left: 20px;
+      padding-left: 18px;
     }
     .help-section ul li::before {
       content: "✔";
       color: #27ae60;
       position: absolute;
       left: 0;
+      font-size: 12px;
+    }
+
+    /* Nested lists (status list) */
+    .help-section ul ul {
+      margin-top: 6px;
+      padding-left: 16px;
+    }
+
+    .help-section ul ul li::before {
+      content: "•";
+      color: #666;
+      font-size: 14px;
+      left: 2px;
     }
     .highlight {
-      font-weight: bold;
+      font-weight: 600;
       color: #e74c3c;
     }
     .link {
@@ -53,13 +79,22 @@ export default `
 
   <div class="help-container">
     <div class="help-title">📋 Understanding the Jobs List</div>
-    <p>This page lists all submitted jobs (process executions), their current status, and available actions.</p>
+    <div class="help-intro">
+      This page lists all submitted jobs (process executions), their current status, and available actions.
+    </div>
 
     <div class="help-section">
       <h5>1. Browsing Submitted Jobs</h5>
       <ul>
-        <li>Each job shows its <span class="highlight">Job ID</span>, <span class="highlight">Process</span>, <span class="highlight">Status</span>, and <span class="highlight">Created Time</span>.</li>
-        <li>Status values include:
+        <li>
+          Each job shows its
+          <span class="highlight">Job ID</span>,
+          <span class="highlight">Process</span>,
+          <span class="highlight">Status</span>,
+          and <span class="highlight">Created Time</span>.
+        </li>
+        <li>
+          Status values include:
           <ul>
             <li><span class="highlight">running</span> — process is executing.</li>
             <li><span class="highlight">successful</span> — process finished and results are available.</li>
@@ -82,7 +117,10 @@ export default `
       <h5>3. Managing Jobs</h5>
       <ul>
         <li>Use <span class="highlight">Delete</span> to permanently remove a job from the list.</li>
-        <li>The <span class="highlight">Actions menu</span> may contain extra links (e.g., direct results, logs, or metadata) provided by the server.</li>
+        <li>
+          The <span class="highlight">Actions menu</span> may contain extra links
+          (e.g., direct results, logs, or metadata) provided by the server.
+        </li>
       </ul>
     </div>
 
@@ -97,15 +135,30 @@ export default `
 
     <div class="help-section">
       <h5>5. Related Standards</h5>
-      <p>This feature follows the <a class="link" href="https://ogcapi.ogc.org/processes" target="_blank">OGC API - Processes (Jobs)</a> standard for managing asynchronous executions.</p>
+      <p>
+        This feature follows the
+        <a class="link" href="https://ogcapi.ogc.org/processes" target="_blank">
+          OGC API – Processes (Jobs)
+        </a>
+        standard for managing asynchronous executions.
+      </p>
     </div>
 
     <div class="help-section">
       <h5>6. FAQ — Common Issues</h5>
       <ul>
-        <li><span class="highlight">Job stuck in running?</span> — Refresh or check server logs; the process may still be executing.</li>
-        <li><span class="highlight">No results?</span> — Verify the job succeeded and outputs were requested with correct transmission mode.</li>
-        <li><span class="highlight">Deleted job still visible?</span> — Try refreshing; if still present, deletion may not be supported by the server.</li>
+        <li>
+          <span class="highlight">Job stuck in running?</span> —
+          Refresh or check server logs; the process may still be executing.
+        </li>
+        <li>
+          <span class="highlight">No results?</span> —
+          Verify the job succeeded and outputs were requested with correct transmission mode.
+        </li>
+        <li>
+          <span class="highlight">Deleted job still visible?</span> —
+          Try refreshing; if still present, deletion may not be supported by the server.
+        </li>
       </ul>
     </div>
   </div>

@@ -17,9 +17,16 @@
         <!-- ✅ Help Dialog -->
         <HelpDialog
           v-model="helpVisible"
-          title="Jobs List Help"
-          :help-content="helpContent"
-        />
+          :title="t('Jobs List Help')"
+        >
+          <div
+            v-if="helpContent"
+            v-html="helpContent"
+          />
+          <div v-else class="text-negative">
+            {{ t('No data or failed to fetch') }}
+          </div>
+        </HelpDialog>
 
         <q-separator />
 
