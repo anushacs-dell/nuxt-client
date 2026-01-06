@@ -447,13 +447,27 @@ onMounted(() => {
 
 // table helpers and computed 
 const columns = [
-  { name: 'id', label: '#', field: 'id', align: 'left', sortable: true },
-  { name: 'description', label: 'Description', field: 'description', align: 'left', sortable: true },
+  {
+    name: 'id',
+    label: '#',
+    field: 'id',
+    align: 'left',
+    sortable: true,
+    style: 'width: 160px'
+  },
+  {
+    name: 'description',
+    label: 'Description',
+    field: 'description',
+    align: 'left',
+    sortable: true,
+    style: 'max-width: 420px'
+  },
   {
     name: 'link',
-    label: 'Lien',
-    field: row => row.links?.[0]?.href || '',
-    align: 'left',
+    label: 'Actions',
+    align: 'center',
+    style: 'width: 140px',
     sortable: false
   }
 ]
@@ -509,7 +523,18 @@ const onClearSearch = async () => {
           />
         </div>
 
-        <HelpDialog v-model="helpVisible" title="Processes List Help" :help-content="helpContent" />
+        <HelpDialog
+          v-model="helpVisible"
+          :title="t('Processes List Help')"
+        >
+          <div
+            v-if="helpContent"
+            v-html="helpContent"
+          />
+          <div v-else class="text-negative">
+            {{ t('No data or failed to fetch') }}
+          </div>
+        </HelpDialog>
         <q-separator />
 
         <div class="q-mb-md">
@@ -526,6 +551,13 @@ const onClearSearch = async () => {
 
 
             <q-table :title="t('Processes List')" :rows="rows" :columns="columns" row-key="id" @row-click="onRowClick">
+              <template v-slot:body-cell-description="{ row }">
+                <q-td>
+                  <div class="description-cell">
+                    {{ row.description || '—' }}
+                  </div>
+                </q-td>
+              </template>
               <template v-slot:body-cell-link="{ row }">
                 <q-td class="text-center">
                   <q-btn-dropdown v-if="row.mutable === true" color="primary" label="Actions" flat @click.stop>
@@ -860,6 +892,14 @@ const onClearSearch = async () => {
 .long-text {
   word-break: break-all;
   overflow-wrap: anywhere;
+}
+
+.description-cell {
+  white-space: normal !important;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  max-width: 420px;
+  line-height: 1.4;
 }
 
 .dialog-pre {
