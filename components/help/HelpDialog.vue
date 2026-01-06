@@ -28,7 +28,10 @@
 
       <!-- Footer (optional, fixed) -->
       <q-separator v-if="$slots.footer" />
-      <q-card-section v-if="$slots.footer">
+      <q-card-section
+        v-if="$slots.footer"
+        class="dialog-footer"
+      >
         <slot name="footer" />
       </q-card-section>
 
@@ -48,12 +51,28 @@ const emit = defineEmits<{
 </script>
 
 <style scoped>
+.app-dialog {
+  width: 80vw;
+  max-width: 900px;
+  height: 75vh;
+  display: flex;
+  flex-direction: column;
+}
 
 .dialog-header {
-  position: sticky;
-  top: 0;
   background: white;
-  z-index: 10;
+  flex-shrink: 0;
+}
+
+.dialog-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.dialog-footer {
+  background: white;
+  flex-shrink: 0;
 }
 
 </style>
