@@ -226,7 +226,7 @@ const fetchLinkContent = async (href: string) => {
       }
     }
 
-    modalContent.value = JSON.stringify(response, null, 2)
+    modalContent.value = typeof response === 'object' ? JSON.stringify(response, null, 2) : response
     showModal.value = true
 
   } catch (err) {
