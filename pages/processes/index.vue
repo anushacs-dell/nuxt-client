@@ -170,8 +170,15 @@ const visualizeCwl = async (row: any) => {
         'Accept-Language': locale.value
       }
     })
-    if (!res.ok) throw new Error(`Failed to fetch package (${res.status})`)
-    
+    if (!res.ok) {
+      Notify.create({
+        type: 'warning',
+        message: t(
+          'Package cannot be accessed'
+        )
+      })
+      return
+    }
 
     const response = await fetch('/cwl-demo/example-workflow.cwl')
     const yamlText = await res.text()
