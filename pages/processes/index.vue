@@ -458,6 +458,32 @@ const columns = [
   }
 ]
 
+const getInputType = (input: any) => {
+  const schema =
+    input?.['original-schema'] ||   
+    input?.schema ||
+    input
+
+  // Handle allOf
+  if (schema?.allOf && Array.isArray(schema.allOf)) {
+    const refObj = schema.allOf.find((s: any) => s.$ref)
+    const formatObj = schema.allOf.find((s: any) => s.format)
+
+    if (formatObj?.format && refObj?.$ref) {
+      return {
+        label: formatObj.format,
+        link: refObj.$ref
+      }
+    }
+  }
+
+  if (schema?.type) {
+    return { label: schema.type }
+  }
+
+  return { label: 'object' }
+}
+
 const rows = computed(() => {
   if (!data.value?.processes) return []
   const term = filter.value.toLowerCase()
@@ -592,7 +618,21 @@ const onClearSearch = async () => {
                       <tbody>
                         <tr v-for="([key, val]) in Object.entries(selectedProcess?.inputs || {})" :key="key">
                           <td>{{ key }}</td>
-                          <td>{{ val?.schema?.type || val?.type || 'unknown' }}</td>
+                          <td>
+                            <template v-if="getInputType(val).link">
+                              <a
+                                :href="getInputType(val).link"
+                                target="_blank"
+                                class="text-primary"
+                              >
+                                {{ getInputType(val).label }}
+                              </a>
+                            </template>
+
+                            <template v-else>
+                              {{ getInputType(val).label }}
+                            </template>
+                          </td>
                           <td>{{ val?.description || '—' }}</td>
                         </tr>
 
