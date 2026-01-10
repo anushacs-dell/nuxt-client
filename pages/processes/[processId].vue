@@ -1435,8 +1435,35 @@ function stopJobTracking() {
     ws = null
   }
 }
- 
- 
+
+function getFormatAndRef(input) {
+  const schemaCandidates = [
+    input['original-schema'],
+    input.schema
+  ].filter(Boolean);
+
+  for (const schema of schemaCandidates) {
+    if (Array.isArray(schema.allOf)) {
+      let format, ref;
+
+      for (const item of schema.allOf) {
+        if (item.format) format = item.format;
+        if (item.$ref) ref = item.$ref;
+      }
+
+      if (format || ref) {
+        return { format, ref };
+      }
+    }
+  }
+
+  // fallback
+  return {
+    format: input.schema?.format || input.schema?.type,
+    ref: input.schema?.$ref
+  };
+}
+
 </script>
 
 <template>
@@ -1645,9 +1672,38 @@ function stopJobTracking() {
            :class="input.minOccurs === 0 ? 'q-pa-sm bg-grey-1 rounded-borders' : ''">
  
             <div class="q-gutter-sm">
-              <q-badge color="grey-3" text-color="black" class="q-mb-sm">
-                {{ typeLabel(input, inputValues[inputId]) }}
-              </q-badge>
+              <q-badge
+                v-if="!isBoundingBoxInput(input)"   
+                color="grey-3"
+                text-color="black"
+                class="q-mb-sm"
+              >
+              <span class="input-type">
+              
+                <template v-if="isComplexInput(input)">
+                  Complex
+                </template>
+
+                <template v-else-if="input.schema?.format">
+                  <a
+                    v-if="input.schema?.$ref"
+                    :href="input.schema.$ref"
+                    target="_blank"
+                    rel="noopener"
+                    class="text-primary text-weight-medium"
+                  >
+                    {{ input.schema.format }}
+                  </a>
+                  <span v-else>
+                    {{ input.schema.format }}
+                  </span>
+                </template>
+
+                <template v-else>
+                  {{ input.schema?.type || '—' }}
+                </template>
+              </span>
+            </q-badge>
  
               <!-- Complex Input (Multiple or Single) -->
               <template v-if="isComplexInput(input)">
@@ -1785,15 +1841,38 @@ function stopJobTracking() {
               <!--  Bounding Box Input with Leaflet Popup -->
               <template v-else-if="isBoundingBoxInput(input)">
                 <div class="bbox-input q-pa-sm bg-grey-1 rounded-borders">
-                  <div class="text-subtitle1 text-weight-medium q-mb-xs">
-                    {{ inputId }} (Bounding Box)
-                  </div>
- 
-                  <!-- Show current bbox -->
-                  <div class="q-mb-sm">
-                    <q-badge color="blue-2" text-color="black" label="BBox:" />
-                    <span class="q-ml-sm text-grey-8">{{ inputValues[inputId].bbox }}</span>
-                    <q-btn flat dense icon="edit" @click="openBboxPopup(inputId)">
+
+                  <div class="q-mb-sm row items-center">
+
+                    <a
+                      v-if="getFormatAndRef(input).ref && getFormatAndRef(input).format"
+                      :href="getFormatAndRef(input).ref"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="text-primary text-weight-medium q-mr-sm"
+                    >
+                      {{ getFormatAndRef(input).format }}:
+                    </a>
+
+                    <span
+                      v-else
+                      class="text-primary text-weight-medium q-mr-sm"
+                    >
+                      {{ getFormatAndRef(input).format || input.schema.type || input.schema?.$ref || '—' }}:
+                    </span>
+                    
+                    <span class="text-grey-8">
+                      [{{ inputValues[inputId].bbox.join(', ') }}]
+                    </span>
+
+                    
+                    <q-btn
+                      flat
+                      dense
+                      icon="edit"
+                      class="q-ml-xs"
+                      @click="openBboxPopup(inputId)"
+                    >
                       <q-tooltip>Edit Bounding Box on Map</q-tooltip>
                     </q-btn>
                   </div>
