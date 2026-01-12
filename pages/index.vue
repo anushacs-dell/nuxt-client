@@ -18,9 +18,16 @@
         <!-- ✅ Help Dialog -->
         <HelpDialog
           v-model="helpVisible"
-          title="Home Help"
-          :help-content="helpContent"
-        />
+          :title="t('Home Help')"
+        >
+          <div
+            v-if="helpContent"
+            v-html="helpContent"
+          />
+          <div v-else class="text-negative">
+            {{ t('No data or failed to fetch') }}
+          </div>
+        </HelpDialog>
 
         <q-card v-if="apiInfo" class="q-pa-md q-mb-lg">
           <q-card-section>
