@@ -461,7 +461,7 @@ const columns = [
     field: 'description',
     align: 'left',
     sortable: true,
-    style: 'max-width: 420px'
+    style: 'width: 100%;'
   },
   {
     name: 'link',
@@ -550,9 +550,17 @@ const onClearSearch = async () => {
         </div>
 
 
-            <q-table :title="t('Processes List')" :rows="rows" :columns="columns" row-key="id" @row-click="onRowClick">
+            <q-table
+              :title="t('Processes List')"
+              :rows="rows"
+              :columns="columns"
+              row-key="id"
+              wrap-cells
+              table-layout="fixed"
+              @row-click="onRowClick"
+            >
               <template v-slot:body-cell-description="{ row }">
-                <q-td>
+                <q-td class="description-td">
                   <div class="description-cell">
                     {{ row.description || '—' }}
                   </div>
@@ -895,16 +903,19 @@ const onClearSearch = async () => {
 }
 
 .description-cell {
-  white-space: normal !important;
+  white-space: normal;
   word-break: break-word;
   overflow-wrap: anywhere;
-  max-width: 420px;
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
 .dialog-pre {
   max-width: 100%;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.description-td {
+  vertical-align: top;
 }
 </style>
