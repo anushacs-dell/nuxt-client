@@ -138,6 +138,11 @@ export default `
           <span class="highlight">Errors on execution?</span> — Ensure all required
           inputs are provided in the correct format.
         </li>
+        <li>
+          <span class="highlight">Application package not accessible?</span> — This may happen after restarting the Kubernetes deployment
+           while keeping the PostgreSQL database running. In this case, the process metadata still exists, but the persistent volume
+            storing the CWL package is empty. Redeploy the process to restore the application package.
+        </li>
       </ul>
     </div>
   </div>
