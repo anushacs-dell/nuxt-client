@@ -174,7 +174,7 @@ const visualizeCwl = async (row: any) => {
       Notify.create({
         type: 'warning',
         message: t(
-          'Package cannot be accessed'
+          'CWL package cannot be accessed'
         )
       })
       return
