@@ -699,7 +699,21 @@ const onClearSearch = async () => {
                       <tbody>
                         <tr v-for="([key, val]) in Object.entries(selectedProcess?.outputs || {})" :key="key">
                           <td>{{ key }}</td>
-                          <td>{{ val?.schema?.type || val?.type || 'unknown' }}</td>
+                          <td>
+                            <template v-if="getInputType(val).link">
+                              <a
+                                :href="getInputType(val).link"
+                                target="_blank"
+                                class="text-primary"
+                              >
+                                {{ getInputType(val).label }}
+                              </a>
+                            </template>
+
+                            <template v-else>
+                              {{ getInputType(val).label }}
+                            </template>
+                          </td>
                           <td>{{ val?.description || '—' }}</td>
                         </tr>
 
