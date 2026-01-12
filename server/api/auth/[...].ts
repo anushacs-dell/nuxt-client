@@ -35,7 +35,7 @@ async function refreshAccessToken(token: any) {
             refresh_token: refreshedToken.refresh_token || token.refresh_token,
         };
     } catch (error) {
-        console.error("Error refreshing access token", error);
+        console.debug("Token refresh failed (expected after logout):", error);
         return {
             ...token,
             error: "RefreshAccessTokenError",
@@ -88,7 +88,11 @@ export default NuxtAuthHandler({
             return session;
         },
 
-        async jwt({token, account}) {
+        async jwt({token, account,trigger}) {
+            if (trigger === 'signOut') {
+                console.log("JWT invalidated on signOut");
+                return null;
+            }
             if (token) {
                 if (account) {
                     token = {
@@ -104,6 +108,10 @@ export default NuxtAuthHandler({
                     };
                 }
 
+                if (token.error === "RefreshAccessTokenError") {
+                    console.log("Previous token refresh failed, not attempting again.");
+                    return token;
+                }
                 if (isTokenExpired(token.access_token_expires_at)) {
                     console.log("Token expired, refreshing...");
                     return await refreshAccessToken(token);
