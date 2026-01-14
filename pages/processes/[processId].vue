@@ -450,8 +450,11 @@ const iconMap: Record<string, string> = {
   organization: "business",
   license: "description",
   keywords: "tag",
+  address: 'place',
   codeRepository: "cloud_upload",
 };
+
+const SCHEMA_INTERNAL_KEYS = ['class', '@context', '@type'];
 
 // Convert URL - softwareVersion
 const extractMetaType = (role: string) => {
@@ -467,6 +470,28 @@ const isUrl = (value) => {
 const openSchema = (url) => {
   window.open(url, "_blank");
 };
+
+const getEntityType = (value: any) => {
+  return value?.['@type'] || null;
+};
+
+const getEntitySchemaUrl = (value: any) => {
+  return value?.['@type']
+    ? `https://schema.org/${value['@type']}`
+    : null;
+};
+
+const getRenderableFields = (value: any) => {
+  if (!value || typeof value !== 'object') return []
+  return Object.entries(value).filter(
+    ([key]) => !SCHEMA_INTERNAL_KEYS.includes(key)
+  )
+}
+
+const prettyAddressKey = (key: string) => {
+  if (key === 's:addressCountry' || key === 'addressCountry') return 'Country'
+  return key
+}
 
  
 onMounted(async () => {
@@ -588,17 +613,22 @@ const pollJobStatus = async (jobId: string) => {
     try {
       const job = await $fetch(jobUrl, { headers })
       jobStatus.value = job.status
- 
-      if (job.status === 'successful') {
-        response.value = job
-        loading.value = false
-        break
-      } else if (job.status === 'failed') {
-        response.value = { error: 'Job failed', details: job }
+
+      // Stop polling when job is finished or canceled
+      if (['successful', 'failed', 'canceled'].includes(job.status)) {
+        if (job.status === 'successful') {
+          response.value = job
+        } else if (job.status === 'failed') {
+          response.value = { error: 'Job failed', details: job }
+        } else if (job.status === 'canceled') {
+          response.value = { info: 'Job was canceled', details: job }
+        }
+
         loading.value = false
         break
       }
- 
+
+      // Poll every 2 seconds
       await new Promise(resolve => setTimeout(resolve, 2000))
     } catch (err) {
       console.error('Polling error:', err)
@@ -670,10 +700,8 @@ function validateAndSubmit() {
  
  
 const submitProcess = async () => {
-  if (loading.value || submitting.value) {
-    return;
-  }
- 
+  if (loading.value || submitting.value) return;
+
   if (!validateRequiredInputs()) {
     $q.notify({
       type: "negative",
@@ -702,9 +730,10 @@ const submitProcess = async () => {
     inProgressUri: `${config.public.SUBSCRIBERURL}?jobid=JOBSOCKET-${channelId.value}&type=inProgress`,
     failedUri: `${config.public.SUBSCRIBERURL}?jobid=JOBSOCKET-${channelId.value}&type=failed`,
   };
- 
+
   try {
     const originalPayload = JSON.parse(jsonRequestPreview.value || "{}");
+
     if (preferMode.value === "respond-async") {
       originalPayload.executionOptions = originalPayload.executionOptions ?? {};
       originalPayload.executionOptions.subscriber = { ...subscribers };
@@ -729,17 +758,21 @@ const submitProcess = async () => {
  
    
     if (preferMode.value === "respond-async") {
-      //  Async execution (requires jobID + websocket updates)
       if (!res || !res.jobID) {
         throw new Error("Expected async response with jobID, but got none");
       }
  
       jobId.value = res.jobID;
-      console.log(" Job submitted (server jobID):", res.jobID);
- 
+      console.log("Job submitted (server jobID):", res.jobID);
+
+      // Start polling in parallel to WS
+      pollJobStatus(res.jobID);
+
+      // WebSocket connection (optional real-time updates)
       ws = new WebSocket(wsUrl);
+
       ws.onopen = () => {
-        console.log(" WebSocket connected — subscribing to", "JOBSOCKET-" + channelId.value);
+        console.log("WebSocket connected — subscribing to", "JOBSOCKET-" + channelId.value);
         ws.send("SUB JOBSOCKET-" + channelId.value);
       };
  
@@ -752,20 +785,21 @@ const submitProcess = async () => {
           const msgId = msg.id ?? null;
  
           if (msgJobId !== "JOBSOCKET-" + channelId.value && msgId !== jobId.value) {
-            if(event.data!="1"){
+            if (event.data != "1") {
               progressPercent.value = 100;
               progressMessage.value = "Completed successfully";
               response.value = JSON.parse(event.data);
               loading.value = false;
               ws?.close();
-            }else
+            } else {
               console.log("Ignored WS message, not for this job:", msgJobId, msgId);
+            }
             return;
           }
 
-          if (jobStatus.value === 'canceled') {
-            loading.value = false
-            ws?.close()
+          if (jobStatus.value === "canceled") {
+            loading.value = false;
+            ws?.close();
           }
  
           // handle progress
@@ -790,7 +824,7 @@ const submitProcess = async () => {
             jobStatus.value = "running...";
           }
         } catch (e) {
-          console.error(" Invalid WS message:", event.data, e);
+          console.error("Invalid WS message:", event.data, e);
         }
       };
  
@@ -800,17 +834,15 @@ const submitProcess = async () => {
       };
  
     } else {
-      //  Sync execution (result returned immediately)
-      console.log(" Sync execution result:", res);
- 
-      //  Check if error response
+      // Sync execution
+      console.log("Sync execution result:", res);
+
       if (res.error) {
-        console.error(" Sync execution error:", res.error);
+        console.error("Sync execution error:", res.error);
         progressMessage.value = res.error.description || "Execution failed";
         jobStatus.value = "failed";
         response.value = res;
       } else {
-        // No status - treat as successful raw result
         progressPercent.value = 100;
         progressMessage.value = "Completed successfully (sync)";
         jobStatus.value = "successful";
@@ -829,6 +861,7 @@ const submitProcess = async () => {
     submitting.value = false;
   }
 };
+
  
  
  
@@ -1359,27 +1392,33 @@ watch(data, (val) => {
   }
 })
 
+// Cancel job while it is running or submitted
 async function cancelJob() {
   if (!jobId.value) return
+
   isCanceling.value = true
+
   try {
     const url = `${config.public.NUXT_ZOO_BASEURL}/ogc-api/jobs/${jobId.value}`
+    
     await $fetch(url, {
       method: 'DELETE',
       headers: {
-        Authorization: `Bearer ${authStore.token?.access_token}`,
-        'Accept-Language': locale.value
+        Authorization: `Bearer ${authStore.token?.access_token}`
       }
     })
-    jobStatus.value = 'canceled'
-    loading.value = false              
-    submitting.value = false         
-    jobId.value = null                 
-    stopJobTracking()
+
+    jobStatus.value = 'canceled' 
+    loading.value = false
+    submitting.value = false
+
+    stopJobTracking()              
     $q.notify({
-      type: 'warning',
+      type: 'positive',
       message: 'Execution canceled'
     })
+
+    // DO NOT null jobId.value here so user can still delete the job if needed
   } catch (err) {
     console.error(err)
     $q.notify({
@@ -1391,14 +1430,65 @@ async function cancelJob() {
   }
 }
 
+const deleteJob = async () => {
+  if (!jobId.value) return
+  isCanceling.value = true
+  try {
+    const url = `${config.public.NUXT_ZOO_BASEURL}/ogc-api/jobs/${jobId.value}`
+    await $fetch(url, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${authStore.token?.access_token}`,
+        'Accept-Language': locale.value
+      }
+    })
+    jobStatus.value = ''
+    response.value = null
+    jobId.value = null
+    $q.notify({ type: 'positive', message: 'Job deleted successfully' })
+  } catch (err) {
+    console.error(err)
+    $q.notify({ type: 'negative', message: 'Delete Failed' })
+  } finally {
+    isCanceling.value = false
+  }
+}
+
 function stopJobTracking() {
   if (ws) {
     ws.close()
     ws = null
   }
 }
- 
- 
+
+function getFormatAndRef(input) {
+  const schemaCandidates = [
+    input['original-schema'],
+    input.schema
+  ].filter(Boolean);
+
+  for (const schema of schemaCandidates) {
+    if (Array.isArray(schema.allOf)) {
+      let format, ref;
+
+      for (const item of schema.allOf) {
+        if (item.format) format = item.format;
+        if (item.$ref) ref = item.$ref;
+      }
+
+      if (format || ref) {
+        return { format, ref };
+      }
+    }
+  }
+
+  // fallback
+  return {
+    format: input.schema?.format || input.schema?.type,
+    ref: input.schema?.$ref
+  };
+}
+
 </script>
 
 <template>
@@ -1459,7 +1549,7 @@ function stopJobTracking() {
             dense
             dense-toggle
             class="rounded-borders bg-white q-mt-md shadow-1"
-          >
+            >
             <q-card-section>
 
               <div v-if="data.metadata?.length">
@@ -1495,70 +1585,78 @@ function stopJobTracking() {
                   {{ md.title }}
                 </div>
 
-                  <!--Person object -->
-                  <div
-                    v-if="md.value?.['@type'] === 'Person'"
-                    class="q-mt-xs text-grey-8"
-                  >
-                    <div><strong>Name:</strong> {{ md.value.name }}</div>
-                    <div v-if="md.value.email">
-                      <strong>Email:</strong>
-                      <a :href="'mailto:' + md.value.email" class="text-primary">{{ md.value.email }}</a>
-                    </div>
-                    <div v-if="md.value.affiliation">
-                      <strong>Affiliation:</strong> {{ md.value.affiliation }}
-                    </div>
-                  </div>
+                      <!-- Simple string value -->
+                      <div v-else-if="typeof md.value === 'string'" class="q-mt-xs text-grey-8 long-text">
+                        <template v-if="isUrl(md.value)">
+                          <a :href="md.value" target="_blank" class="text-primary">
+                            {{ md.value }}
+                          </a>
+                        </template>
+                        <template v-else>
+                          {{ md.value }}
+                        </template>
+                      </div>
 
-                  <!-- Organization object -->
-                  <div
-                    v-else-if="md.value?.['@type'] === 'Organization'"
-                    class="q-mt-xs text-grey-8"
-                  >
-                    <div><strong>Name:</strong> {{ md.value.name }}</div>
+                      <!-- Object value -->
+                      <div v-else-if="typeof md.value === 'object'" class="q-mt-xs">
 
-                    <div v-if="md.value.url">
-                      <strong>URL:</strong>
-                      <a :href="md.value.url" target="_blank" class="text-primary">
-                        {{ md.value.url }}
-                      </a>
-                    </div>
+                        <!-- ENTITY TYPE -->
+                        <div
+                          v-if="getEntityType(md.value)"
+                          class="text-caption text-primary cursor-pointer q-mb-xs"
+                          @click="openSchema(getEntitySchemaUrl(md.value))"
+                        >
+                          {{ getEntityType(md.value) }}
+                        </div>
 
-                    <div v-if="md.value.address">
-                      <strong>Country:</strong>
-                      {{
-                        md.value.address.addressCountry ||
-                        md.value.address["s:addressCountry"] ||
-                        md.value.address.country ||
-                        '—'
-                      }}
-                    </div>
-                  </div>
 
-                  <!-- Simple string value -->
-                  <div v-else-if="typeof md.value === 'string'" class="q-mt-xs text-grey-8">
-                    {{ md.value }}
-                  </div>
 
-                  <!-- Nested object -->
-                  <div v-else-if="typeof md.value === 'object'" class="q-mt-xs">
-                    <div
-                      v-for="(v, key) in md.value"
-                      :key="key"
-                      class="q-mb-xs text-grey-8"
-                    >
-                      <strong>{{ key }}:</strong>
-                      
-                      <!-- If URL inside nested value -->
-                      <template v-if="isUrl(v)">
-                        <a :href="v" target="_blank" class="text-primary">{{ v }}</a>
-                      </template>
+                        <!-- ENTITY FIELDS -->
+                          <div
+                            v-for="([key, v], i) in getRenderableFields(md.value)"
+                            :key="i"
+                            class="q-mb-xs text-grey-8"
+                          >
 
-                      <template v-else>
-                        {{ v }}
-                      </template>
-                    </div>
-                  </div>
+                        <template v-if="key === 'address' && typeof v === 'object'">
+                          <div class="q-mt-sm">
+                            <strong>
+                              <q-icon name="place" size="14px" class="q-mr-xs text-primary" />
+                              address:
+                            </strong>
+
+                            <div class="q-ml-lg q-mt-xs">
+                              <div
+                                v-for="([addrKey, addrVal], i) in getRenderableFields(v)"
+                                :key="i"
+                                class="q-mb-xs"
+                              >
+                                <strong>{{ prettyAddressKey(addrKey) }}:</strong>
+                                <span class="q-ml-xs">{{ addrVal }}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </template>
+
+                          
+                        <!-- Normal fields -->
+                        <template v-else>
+                          <strong class="q-mr-xs">{{ key }}:</strong>
+
+                          <span class="long-text">
+                            <template v-if="isUrl(v)">
+                              <a :href="v" target="_blank" class="text-primary">
+                                {{ v }}
+                              </a>
+                            </template>
+                            <template v-else>
+                              {{ v }}
+                            </template>
+                          </span>
+                        </template>
+                        </div>
+
+                      </div>                 
 
                 </div>
 
@@ -1607,9 +1705,38 @@ function stopJobTracking() {
            :class="input.minOccurs === 0 ? 'q-pa-sm bg-grey-1 rounded-borders' : ''">
  
             <div class="q-gutter-sm">
-              <q-badge color="grey-3" text-color="black" class="q-mb-sm">
-                {{ typeLabel(input, inputValues[inputId]) }}
-              </q-badge>
+              <q-badge
+                v-if="!isBoundingBoxInput(input)"   
+                color="grey-3"
+                text-color="black"
+                class="q-mb-sm"
+              >
+              <span class="input-type">
+              
+                <template v-if="isComplexInput(input)">
+                  Complex
+                </template>
+
+                <template v-else-if="input.schema?.format">
+                  <a
+                    v-if="input.schema?.$ref"
+                    :href="input.schema.$ref"
+                    target="_blank"
+                    rel="noopener"
+                    class="text-primary text-weight-medium"
+                  >
+                    {{ input.schema.format }}
+                  </a>
+                  <span v-else>
+                    {{ input.schema.format }}
+                  </span>
+                </template>
+
+                <template v-else>
+                  {{ input.schema?.type || '—' }}
+                </template>
+              </span>
+            </q-badge>
  
               <!-- Complex Input (Multiple or Single) -->
               <template v-if="isComplexInput(input)">
@@ -1747,15 +1874,38 @@ function stopJobTracking() {
               <!--  Bounding Box Input with Leaflet Popup -->
               <template v-else-if="isBoundingBoxInput(input)">
                 <div class="bbox-input q-pa-sm bg-grey-1 rounded-borders">
-                  <div class="text-subtitle1 text-weight-medium q-mb-xs">
-                    {{ inputId }} (Bounding Box)
-                  </div>
- 
-                  <!-- Show current bbox -->
-                  <div class="q-mb-sm">
-                    <q-badge color="blue-2" text-color="black" label="BBox:" />
-                    <span class="q-ml-sm text-grey-8">{{ inputValues[inputId].bbox }}</span>
-                    <q-btn flat dense icon="edit" @click="openBboxPopup(inputId)">
+
+                  <div class="q-mb-sm row items-center">
+
+                    <a
+                      v-if="getFormatAndRef(input).ref && getFormatAndRef(input).format"
+                      :href="getFormatAndRef(input).ref"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="text-primary text-weight-medium q-mr-sm"
+                    >
+                      {{ getFormatAndRef(input).format }}:
+                    </a>
+
+                    <span
+                      v-else
+                      class="text-primary text-weight-medium q-mr-sm"
+                    >
+                      {{ getFormatAndRef(input).format || input.schema.type || input.schema?.$ref || '—' }}:
+                    </span>
+                    
+                    <span class="text-grey-8">
+                      [{{ inputValues[inputId].bbox.join(', ') }}]
+                    </span>
+
+                    
+                    <q-btn
+                      flat
+                      dense
+                      icon="edit"
+                      class="q-ml-xs"
+                      @click="openBboxPopup(inputId)"
+                    >
                       <q-tooltip>Edit Bounding Box on Map</q-tooltip>
                     </q-btn>
                   </div>
@@ -2010,13 +2160,32 @@ function stopJobTracking() {
             :disable="jobStatus === 'running' || jobStatus === 'submitted'"
           />
           <q-btn color="primary" outline label="Show JSON Preview" @click="showDialog = true" />
-          <div v-if="jobStatus === 'running' || jobStatus === 'submitted'" class="q-mt-md">
+          <!-- Cancel while job is running / submitted -->
+          <div
+            v-if="jobStatus === 'submitted' || jobStatus === 'running'"
+            class="q-mt-md"
+          >
             <q-btn
-              label="Cancel"
               color="negative"
               icon="cancel"
               :loading="isCanceling"
               @click="cancelJob"
+              :label="isCanceling ? 'Canceling…' : 'Cancel Job'"
+            />
+          </div>
+
+          <!-- Delete after job finished -->
+          <div
+            v-else-if="jobStatus === 'successful' || jobStatus === 'failed'"
+            class="q-mt-md"
+          >
+            <q-btn
+              color="negative"
+              outline
+              icon="delete"
+              :loading="isCanceling"
+              @click="deleteJob"
+              :label="isCanceling ? 'Deleting…' : 'Delete Job'"
             />
           </div> 
         </div>
