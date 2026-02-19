@@ -6,7 +6,7 @@
   >
     <q-card class="app-dialog">
 
-      <!-- Fixed header -->
+      <!-- header -->
       <q-card-section class="row items-center dialog-header">
         <div class="text-h6">{{ title }}</div>
         <q-space />
@@ -21,12 +21,11 @@
 
       <q-separator />
 
-      <!-- Scrollable body -->
       <q-card-section class="dialog-body">
         <slot />
       </q-card-section>
 
-      <!-- Footer (optional, fixed) -->
+      <!-- Footer -->
       <q-separator v-if="$slots.footer" />
       <q-card-section v-if="$slots.footer">
         <slot name="footer" />
