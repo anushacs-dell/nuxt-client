@@ -135,35 +135,84 @@ const getSupportedFormats = (schema: any): string[] => {
   return Array.from(new Set(list))
 }
  
- 
-// Provide a readable label for the q-badge (so complex shows the media type OR href/value mode)
-const typeLabel = (input: any, valForInputId: any) => {
-  if (hasContentMedia(input.schema)) {
-    // Handle array case (multiple complex inputs)
-    if (Array.isArray(valForInputId)) {
-      const item = valForInputId[0]
-      if (item?.mode === 'href') return 'complex (provide URL)'
-      if (item?.mode === 'value') {
-        const fmt = item?.format
-        return fmt ? `complex (${fmt})` : 'Provide Value Inline'
-      }
-    }
-    // Handle single complex input
-    else if (valForInputId && typeof valForInputId === 'object') {
-      if (valForInputId.mode === 'href') return 'complex (provide URL)'
-      if (valForInputId.mode === 'value') {
-        const fmt = valForInputId?.format
-        return fmt ? `complex (${fmt})` : 'Provide Value Inline'
-      }
-    }
-    return 'complex'
+
+const isUriLiteralInput = (input: any): boolean => {
+  const schema = input?.schema;
+  if (!schema) return false;
+
+  if (schema.format === 'uri' || schema.format === 'url') {
+    return true;
   }
-    if (input?.schema?.type === 'array') {
-      const itemType = getArrayItemType(input.schema)
-      return `array(${itemType})`
+
+  if (
+    schema.contentMediaType === 'text/uri-list' ||
+    schema.contentMediaType === 'application/uri'
+  ) {
+    return true;
+  }
+
+  const variants = schema.anyOf || schema.oneOf;
+  if (Array.isArray(variants)) {
+    return variants.some(
+      (v) =>
+        v?.format === 'uri' ||
+        v?.format === 'url' ||
+        v?.contentMediaType === 'text/uri-list'
+    );
+  }
+
+  return false;
+};
+
+
+// Provide a readable label for the q-badge (so complex shows the media type OR href/value mode)
+const typeLabel = (input: any, inputId: string, valForInputId?: any) => {
+
+  if (hasContentMedia(input.schema)) {
+
+    if (Array.isArray(valForInputId) && valForInputId.length > 0) {
+      const item = valForInputId[0];
+
+      if (item?.mode === 'href') {
+        return 'complex (URL)';
+      }
+
+      if (item?.mode === 'value') {
+        const fmt = item?.format;
+        return fmt ? `complex (${fmt})` : 'complex (inline value)';
+      }
     }
-    return input?.schema?.type || 'literal'
-}
+
+    if (valForInputId && typeof valForInputId === 'object') {
+      if (valForInputId.mode === 'href') {
+        return 'complex (URL)';
+      }
+
+      if (valForInputId.mode === 'value') {
+        const fmt = valForInputId?.format;
+        return fmt ? `complex (${fmt})` : 'complex (inline value)';
+      }
+    }
+
+    return 'complex';
+  }
+
+  if (input?.schema?.type === 'array') {
+    const itemType = getArrayItemType(input.schema);
+    return `array(${itemType})`;
+  }
+
+  if (isUriLiteralInput(input, inputId)) {
+    return 'string (URI)';
+  }
+
+  if (input?.schema?.type) {
+    return input.schema.type;
+  }
+
+  return 'string';
+};
+
  
 const normalizeBboxSchema = (schema: any) => {
   if (!schema) return schema
@@ -1808,38 +1857,14 @@ function getFormatAndRef(input) {
  
             <div class="q-gutter-sm">
               <q-badge
-                v-if="!isBoundingBoxInput(input)"   
+                v-if="!isBoundingBoxInput(input)"
                 color="grey-3"
                 text-color="black"
                 class="q-mb-sm"
               >
-              <span class="input-type">
+                {{ typeLabel(input, inputId) }}
+              </q-badge>
               
-                <template v-if="isComplexInput(input)">
-                  Complex
-                </template>
-
-                <template v-else-if="input.schema?.format">
-                  <a
-                    v-if="input.schema?.$ref"
-                    :href="input.schema.$ref"
-                    target="_blank"
-                    rel="noopener"
-                    class="text-primary text-weight-medium"
-                  >
-                    {{ input.schema.format }}
-                  </a>
-                  <span v-else>
-                    {{ input.schema.format }}
-                  </span>
-                </template>
-
-                <template v-else>
-                  {{ typeLabel(input) }}
-                </template>
-              </span>
-            </q-badge>
- 
               <!-- Complex Input (Multiple or Single) -->
               <template v-if="isComplexInput(input)">
                 <template v-if="Array.isArray(inputValues[inputId])">
