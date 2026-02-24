@@ -1790,20 +1790,56 @@ function getFormatAndRef(input) {
                         </template>
 
                           
-                        <!-- Normal fields -->
                         <template v-else>
                           <strong class="q-mr-xs">{{ key }}:</strong>
 
-                          <span class="long-text">
-                            <template v-if="isUrl(v)">
-                              <a :href="v" target="_blank" class="text-primary">
+                          <!--  If nested object -->
+                          <template v-if="typeof v === 'object'">
+                            <div class="q-ml-md q-mt-xs">
+
+                              <div
+                                v-if="getEntityType(v)"
+                                class="text-caption text-primary cursor-pointer q-mb-xs"
+                                @click="openSchema(getEntitySchemaUrl(v))"
+                              >
+                                {{ getEntityType(v) }}
+                              </div>
+
+                              <div
+                                v-for="([nestedKey, nestedVal], j) in getRenderableFields(v)"
+                                :key="j"
+                                class="q-mb-xs"
+                              >
+                                <strong>{{ normalizeType(nestedKey) }}:</strong>
+
+                                <span class="q-ml-xs">
+                                  <template v-if="isUrl(nestedVal)">
+                                    <a :href="nestedVal" target="_blank" class="text-primary">
+                                      {{ nestedVal }}
+                                    </a>
+                                  </template>
+                                  <template v-else>
+                                    {{ nestedVal }}
+                                  </template>
+                                </span>
+
+                              </div>
+                            </div>
+                          </template>
+
+                          <!-- If string -->
+                          <template v-else>
+                            <span class="long-text">
+                              <template v-if="isUrl(v)">
+                                <a :href="v" target="_blank" class="text-primary">
+                                  {{ v }}
+                                </a>
+                              </template>
+                              <template v-else>
                                 {{ v }}
-                              </a>
-                            </template>
-                            <template v-else>
-                              {{ v }}
-                            </template>
-                          </span>
+                              </template>
+                            </span>
+                          </template>
                         </template>
                         </div>
 
