@@ -8,7 +8,8 @@
         "generate": "nuxt generate",
         "preview": "nuxt preview",
         "postinstall": "nuxt prepare",
-        "start": "nuxt start"
+        "start": "nuxt start",
+        "test": "vitest"
     },
     "dependencies": {
         "@auth/core": "^0.34.2",
@@ -50,7 +51,9 @@
     "devDependencies": {
         "@types/crypto-js": "^4.2.2",
         "cross-spawn": ">=7.0.5",
+        "happy-dom": "^20.7.0",
         "rollup": ">=4.22.4",
-        "vite": ">=5.4.6"
+        "vite": ">=5.4.6",
+        "vitest": "^4.0.18"
     }
 }
