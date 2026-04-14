@@ -24,13 +24,10 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Install required tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y curl jq coreutils
-
       - name: Download CWL files
         run: |
+          sudo apt-get install -y jq 
+
           mkdir -p tests/fixtures
 
           REPOS=(
@@ -54,6 +51,11 @@ jobs:
                 curl -L $url -o tests/fixtures/${REPO//\//-}-$filename
               done
           done
+
+          if [ -z "$(ls -A tests/fixtures)" ]; then
+            echo "❌ No CWL files downloaded!"
+            exit 1
+          fi
 
       - name: Run tests
         run: npm run test
