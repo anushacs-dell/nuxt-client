@@ -28,19 +28,21 @@ jobs:
         run: |
           mkdir -p tests/fixtures
 
-          REPOS=(
-            "eoap/application-package-patterns/cwl-workflow"
-            "GeoLabs/KindGrove"
+          CONFIGS=(
+          # Format: "owner/repo|folder-path|version(branch/tag)"
+            "eoap/application-package-patterns|cwl-workflow|main"
+            "GeoLabs/KindGrove||v0.0.1-rc8"
           )
 
-          for repo_path in "${REPOS[@]}"; do
-            REPO=$(echo $repo_path | cut -d'/' -f1,2)
-            SUB_PATH=$(echo $repo_path | cut -d'/' -f3-)
+          for config in "${CONFIGS[@]}"; do
+            REPO=$(echo "$config" | cut -d'|' -f1)
+            SUB_PATH=$(echo "$config" | cut -d'|' -f2)
+            REF=$(echo "$config" | cut -d'|' -f3)
 
             if [ -z "$SUB_PATH" ]; then
-              API_URL="https://api.github.com/repos/$REPO/contents"
+              API_URL="https://api.github.com/repos/$REPO/contents?ref=$REF"
             else
-              API_URL="https://api.github.com/repos/$REPO/contents/$SUB_PATH"
+              API_URL="https://api.github.com/repos/$REPO/contents/$SUB_PATH?ref=$REF"
             fi
 
             echo "Fetching from $API_URL"
@@ -52,12 +54,12 @@ jobs:
 
                 echo "Downloading $filename from $REPO"
 
-                curl -L $url -o tests/fixtures/${REPO//\//-}-$filename
+                curl -L "$url" -o tests/fixtures/${REPO//\//-}-$filename
               done
           done
 
           if [ -z "$(ls -A tests/fixtures)" ]; then
-            echo "❌ No CWL files downloaded!"
+            echo "No CWL files downloaded!"
             exit 1
           fi
 
