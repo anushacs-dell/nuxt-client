@@ -26,7 +26,8 @@ jobs:
 
       - name: Download CWL files
         run: |
-          sudo apt-get install -y jq 
+          sudo apt-get update
+          sudo apt-get install -y curl jq coreutils
 
           mkdir -p tests/fixtures
 
@@ -37,11 +38,17 @@ jobs:
 
           for repo_path in "${REPOS[@]}"; do
             REPO=$(echo $repo_path | cut -d'/' -f1,2)
-            PATH=$(echo $repo_path | cut -d'/' -f3-)
+            SUB_PATH=$(echo $repo_path | cut -d'/' -f3-)
 
-            echo "Fetching from $REPO/$PATH"
+            if [ -z "$SUB_PATH" ]; then
+              API_URL="https://api.github.com/repos/$REPO/contents"
+            else
+              API_URL="https://api.github.com/repos/$REPO/contents/$SUB_PATH"
+            fi
 
-            curl -s https://api.github.com/repos/$REPO/contents/$PATH \
+            echo "Fetching from $API_URL"
+
+            curl -s $API_URL \
             | jq -r '.[] | select(.name | endswith(".cwl")) | .download_url' \
             | while read url; do
                 filename=$(basename $url)
