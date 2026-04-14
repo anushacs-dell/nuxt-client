@@ -28,10 +28,26 @@ jobs:
         run: |
           mkdir -p tests/fixtures
 
-          FILES="pattern-1.cwl helloworld-pipeline.cwl pattern-2.cwl pattern-3.cwl "
+          REPOS=(
+            "eoap/application-package-patterns/cwl-workflow"
+            "GeoLabs/KindGrove"
+          )
 
-          for file in $FILES; do
-            curl -L https://raw.githubusercontent.com/eoap/application-package-patterns/main/cwl-workflow/$file -o tests/fixtures/$file
+          for repo_path in "${REPOS[@]}"; do
+            REPO=$(echo $repo_path | cut -d'/' -f1,2)
+            PATH=$(echo $repo_path | cut -d'/' -f3-)
+
+            echo "Fetching from $REPO/$PATH"
+
+            curl -s https://api.github.com/repos/$REPO/contents/$PATH \
+            | jq -r '.[] | select(.name | endswith(".cwl")) | .download_url' \
+            | while read url; do
+                filename=$(basename $url)
+
+                echo "Downloading $filename from $REPO"
+
+                curl -L $url -o tests/fixtures/${REPO//\//-}-$filename
+              done
           done
 
       - name: Run tests
