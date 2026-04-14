@@ -28,10 +28,11 @@ jobs:
         run: |
           mkdir -p tests/fixtures
 
-          CONFIGS=(
           # Format: "owner/repo|folder-path|version(branch/tag)"
+          CONFIGS=(
             "eoap/application-package-patterns|cwl-workflow|main"
             "GeoLabs/KindGrove||v0.0.1-rc8"
+            "ZOO-Project/charts|zoo-project-dru/files/example|main"
           )
 
           for config in "${CONFIGS[@]}"; do
