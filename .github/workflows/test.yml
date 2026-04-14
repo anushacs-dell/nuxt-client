@@ -24,5 +24,15 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Download CWL files
+        run: |
+          mkdir -p tests/fixtures
+
+          FILES="pattern-1.cwl helloworld-pipeline.cwl pattern-2.cwl pattern-3.cwl "
+
+          for file in $FILES; do
+            curl -L https://raw.githubusercontent.com/eoap/application-package-patterns/main/cwl-workflow/$file -o tests/fixtures/$file
+          done
+
       - name: Run tests
         run: npm run test
