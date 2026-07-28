@@ -443,7 +443,12 @@ const submitForm = async () => {
           message: t('Deploying process...'),
           timeout: 2000
     })
-    const deployUrl = await buildOgcApiUrl(`/processes?w=${processName.value}`, {
+
+    const deployPath = processName.value
+      ? `/processes?w=${processName.value}`
+      : `/processes`
+
+    const deployUrl = await buildOgcApiUrl(deployPath, {
       acceptLanguage: locale.value
     })
 
